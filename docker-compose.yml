@@ -1,0 +1,84 @@
+name: ocean
+
+services:
+  frontend:
+    container_name: ocean-frontend
+    build:
+      context: ./frontend
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    volumes:
+      - ./frontend:/app:Z
+    environment:
+      NPM_CONFIG_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    networks:
+      - ocean
+
+  php:
+    container_name: ocean-php
+    build: ./php
+    volumes:
+      - ./src:/var/www/html:Z
+    environment:
+      PHP_IDE_CONFIG: "serverName=php-dev"
+    networks:
+      - ocean
+
+  nginx:
+    container_name: ocean-nginx
+    image: docker.io/library/nginx:alpine
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./src:/var/www/html:Z
+      - ./nginx:/etc/nginx/conf.d:ro,Z
+    depends_on:
+      - php
+    networks:
+      - ocean
+
+  python:
+    container_name: ocean-python
+    build:
+      context: ./python
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
+    working_dir: /workspace
+    volumes:
+      - ./python:/workspace:Z
+    networks:
+      - ocean
+
+  db:
+    container_name: ocean-db
+    image: docker.io/library/mariadb:11
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-test_db}
+    volumes:
+      - ./mysql:/var/lib/mysql:Z
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    networks:
+      - ocean
+
+  phpmyadmin:
+    container_name: ocean-phpmyadmin
+    image: docker.io/library/phpmyadmin
+    ports:
+      - "${PHPMYADMIN_PORT:-8081}:80"
+    environment:
+      PMA_HOST: ${PMA_HOST:-db}
+      PMA_USER: ${PMA_USER:-root}
+      PMA_PASSWORD: ${PMA_PASSWORD:-root}
+    depends_on:
+      - db
+    networks:
+      - ocean
+
+networks:
+  ocean:
+    name: ocean-network

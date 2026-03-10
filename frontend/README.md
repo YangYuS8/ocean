@@ -1,75 +1,61 @@
-# Nuxt Minimal Starter
+# Ocean Frontend
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Nuxt 4 frontend for the ocean sample and inspection system.
+
+## Template Basis
+
+This frontend is adapted from the Nuxt UI Dashboard template:
+
+- Template: `github:nuxt-ui-templates/dashboard`
+- Runtime: Nuxt 4 Node/Nitro on port `3000`
+- Package manager: `pnpm`
+
+The project keeps the existing deployment model:
+
+- Nuxt serves the frontend on `3000`
+- Nginx proxies browser traffic to Nuxt
+- `/api/` remains routed to the PHP backend
+
+## Workspace Modules
+
+- Overview
+- Sample Management
+- Inspection Tasks
+- Equipment Monitoring
+- Reports
+- Settings
+
+The current UI focuses on the dashboard shell, module entry pages, responsive navigation and project branding. Real business metrics and backend integrations are planned for follow-up work.
+
+## Template Adaptation Decisions
+
+- Kept: dashboard sidebar, responsive panel layout and command/search entry for fast workspace switching.
+- Deferred: notification drawer and heavier demo interactions until real alert data is available.
+- Replaced: template labels, page structure and homepage content with ocean sample and inspection terminology.
+
+## Integration Roadmap
+
+- PHP `/api/` will provide workspace-facing business data such as sample lists, inspection tasks and report summaries.
+- Redis-backed async tasks will later surface queue status, analysis progress and alert triggers in the dashboard.
+- Python analysis results will be exposed through backend APIs after image-processing and statistical workflows are stabilized.
 
 ## Setup
 
-Make sure to install dependencies:
-
 ```bash
-# npm
-npm install
-
-# pnpm
 pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
 ```
 
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+## Development
 
 ```bash
-# npm
-npm run dev
-
-# pnpm
 pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
+The development server listens on `http://localhost:3000`.
 
-Build the application for production:
+## Validation
 
 ```bash
-# npm
-npm run build
-
-# pnpm
+pnpm typecheck
 pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
 ```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.

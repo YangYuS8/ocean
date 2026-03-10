@@ -9,10 +9,14 @@ services:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     volumes:
       - ./frontend:/app:Z
+      - frontend-node-modules:/app/node_modules
+      - frontend-pnpm-store:/pnpm
     environment:
       NPM_CONFIG_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+      HOST: 0.0.0.0
+      PORT: 3000
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "${FRONTEND_PORT:-3000}:3000"
     networks:
       - ocean
 
@@ -23,6 +27,8 @@ services:
       - ./src:/var/www/html:Z
     environment:
       PHP_IDE_CONFIG: "serverName=php-dev"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     networks:
       - ocean
 
@@ -35,6 +41,7 @@ services:
       - ./src:/var/www/html:Z
       - ./nginx:/etc/nginx/conf.d:ro,Z
     depends_on:
+      - frontend
       - php
     networks:
       - ocean
@@ -49,6 +56,9 @@ services:
     working_dir: /workspace
     volumes:
       - ./python:/workspace:Z
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     networks:
       - ocean
 
@@ -62,6 +72,14 @@ services:
       - ./mysql:/var/lib/mysql:Z
     ports:
       - "${DB_PORT:-3306}:3306"
+    networks:
+      - ocean
+
+  redis:
+    container_name: ocean-redis
+    image: docker.io/library/redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
     networks:
       - ocean
 
@@ -82,3 +100,7 @@ services:
 networks:
   ocean:
     name: ocean-network
+
+volumes:
+  frontend-node-modules:
+  frontend-pnpm-store:

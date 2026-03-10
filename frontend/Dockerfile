@@ -4,5 +4,11 @@ WORKDIR /app
 
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ENV NPM_CONFIG_REGISTRY=${NPM_REGISTRY}
+ENV PNPM_HOME=/pnpm
+ENV PATH=${PNPM_HOME}:${PATH}
+ENV HOST=0.0.0.0
+ENV PORT=3000
 
-CMD ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0 --port 5173"]
+RUN corepack enable
+
+CMD ["sh", "-c", "pnpm install && pnpm dev --host ${HOST} --port ${PORT}"]

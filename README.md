@@ -28,7 +28,7 @@ docker compose up -d --build
 ### 2) 访问地址
 
 - 网站首页：http://localhost:8080
-- 前端开发服务：http://localhost:5173
+- 前端开发服务：http://localhost:3000
 - phpMyAdmin：http://localhost:8081
   - 用户名：`root`
   - 密码：`root`

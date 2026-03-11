@@ -9,6 +9,6 @@ ENV PATH=${PNPM_HOME}:${PATH}
 ENV HOST=0.0.0.0
 ENV PORT=3000
 
-RUN corepack enable
+RUN npm install -g pnpm@10.30.3 --registry=${NPM_REGISTRY}
 
 CMD ["sh", "-c", "pnpm install && pnpm dev --host ${HOST} --port ${PORT}"]

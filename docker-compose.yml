@@ -15,6 +15,7 @@ services:
       NPM_CONFIG_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
       HOST: 0.0.0.0
       PORT: 3000
+      NUXT_PUBLIC_API_BASE: http://nginx
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     networks:
@@ -27,6 +28,11 @@ services:
       - ./src:/var/www/html:Z
     environment:
       PHP_IDE_CONFIG: "serverName=php-dev"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE:-test_db}
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     networks:

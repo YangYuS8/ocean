@@ -1,32 +1,49 @@
 <script setup lang="ts">
 const { commandGroups } = useWorkspace()
+const config = useRuntimeConfig()
 
-const metrics = [
+const { data: summaryData } = await useFetch('/api/dashboard/summary', {
+  baseURL: config.public.apiBase || undefined,
+  default: () => ({
+    data: {
+      pending_samples: 128,
+      today_inspection_tasks: 14,
+      open_exceptions: 3,
+      queued_analysis_jobs: 9
+    }
+  })
+})
+
+const metrics = computed(() => {
+  const summary = summaryData.value?.data
+
+  return [
   {
     title: '待处理样本',
-    value: '128',
+    value: String(summary?.pending_samples ?? 128),
     description: '等待入库、检测或复核的样本总量',
     icon: 'i-lucide-flask-conical'
   },
   {
     title: '今日巡检任务',
-    value: '14',
+    value: String(summary?.today_inspection_tasks ?? 14),
     description: '包含船载设备、实验设备与环境监测点位',
     icon: 'i-lucide-clipboard-check'
   },
   {
     title: '异常告警',
-    value: '3',
+    value: String(summary?.open_exceptions ?? 3),
     description: '存在需人工确认的高优先级异常项',
     icon: 'i-lucide-bell-ring'
   },
   {
     title: '分析队列',
-    value: '9',
+    value: String(summary?.queued_analysis_jobs ?? 9),
     description: '等待 Python 模块处理的图像与统计任务',
     icon: 'i-lucide-cpu'
   }
 ]
+})
 
 const quickLinks = commandGroups.value[0]?.items ?? []
 

@@ -1,9 +1,19 @@
 <script setup lang="ts">
 const { commandGroups } = useWorkspace()
 const config = useRuntimeConfig()
+const apiBase = import.meta.server ? (config.public.apiBase || undefined) : undefined
 
-const { data: summaryData } = await useFetch('/api/dashboard/summary', {
-  baseURL: config.public.apiBase || undefined,
+type SummaryResponse = {
+  data: {
+    pending_samples: number
+    today_inspection_tasks: number
+    open_exceptions: number
+    queued_analysis_jobs: number
+  }
+}
+
+const { data: summaryData } = await useFetch<SummaryResponse>('/api/dashboard/summary', {
+  baseURL: apiBase,
   default: () => ({
     data: {
       pending_samples: 128,
@@ -110,7 +120,7 @@ const activityFeed = [
                   核心工作区入口
                 </h2>
                 <p class="mt-1 text-sm text-toned">
-                  后续页面将在这些入口上逐步接入真实业务能力。
+                  巡检任务与样本管理已接入真实数据，其他工作区继续按 MVP 节奏扩展。
                 </p>
               </div>
               <UBadge color="neutral" variant="soft">
@@ -140,13 +150,13 @@ const activityFeed = [
         <UCard>
           <template #header>
             <div>
-              <h2 class="text-lg font-semibold text-highlighted">
-                最新工作动态
-              </h2>
-              <p class="mt-1 text-sm text-toned">
-                用于占位展示后续待接入的实时状态与人工处理提示。
-              </p>
-            </div>
+                <h2 class="text-lg font-semibold text-highlighted">
+                  最新工作动态
+                </h2>
+                <p class="mt-1 text-sm text-toned">
+                  当前展示与样本、巡检和分析队列相关的工作提示，用于辅助日常演示与排班沟通。
+                </p>
+              </div>
           </template>
 
           <div class="space-y-4">

@@ -58,7 +58,7 @@ const { sidebarOpen, primaryLinks, supportLinks, commandGroups } = useWorkspace(
               当前阶段
             </p>
             <p class="truncate text-xs text-muted">
-              MVP 工作台骨架已启用
+              MVP 核心工作流已接入
             </p>
           </div>
         </div>

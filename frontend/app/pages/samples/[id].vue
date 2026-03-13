@@ -50,6 +50,52 @@ type SampleResultCreateResponse = {
   }
 }
 
+type SampleException = {
+  id: number
+  resource_type: string
+  resource_id: number
+  category: string
+  severity: string
+  title: string
+  description: string | null
+  status: string
+  reported_by: null | {
+    id: number
+    display_name: string
+  }
+  resolved_by: null | {
+    id: number
+    display_name: string
+  }
+  resolved_at: string | null
+  created_at: string | null
+}
+
+type PaginatedResponse<T> = {
+  data: T[]
+  meta: {
+    page: number
+    page_size: number
+    total: number
+  }
+}
+
+type SampleExceptionCreateResponse = {
+  data: {
+    id: number
+    status: string
+    created_at: string
+  }
+}
+
+type SampleExceptionResolveResponse = {
+  data: {
+    id: number
+    status: string
+    resolved_at: string
+  }
+}
+
 const route = useRoute()
 const { baseURL, request, getErrorMessage } = useApiClient()
 
@@ -65,8 +111,19 @@ const { data: resultsData, pending: resultsPending, error: resultsError, refresh
   watch: [sampleId]
 })
 
+const exceptionQuery = computed(() => ({
+  resource_type: 'sample',
+  resource_id: Number(sampleId.value)
+}))
+
+const { data: exceptionsData, pending: exceptionsPending, error: exceptionsError, refresh: refreshExceptions } = await useFetch<PaginatedResponse<SampleException>>('/api/exceptions', {
+  baseURL,
+  query: exceptionQuery
+})
+
 const sample = computed(() => data.value?.data ?? null)
 const results = computed(() => resultsData.value?.data ?? [])
+const exceptions = computed(() => exceptionsData.value?.data ?? [])
 
 const resultTypeOptions = [
   {
@@ -122,6 +179,33 @@ const resultForm = reactive({
   notes: ''
 })
 
+const exceptionCategoryOptions = [
+  { value: 'sample_quality', label: '样本质量问题' },
+  { value: 'record_mismatch', label: '记录信息不一致' },
+  { value: 'handling_issue', label: '处理过程问题' }
+] as const
+
+const exceptionSeverityOptions = [
+  { value: 'low', label: '低' },
+  { value: 'medium', label: '中' },
+  { value: 'high', label: '高' },
+  { value: 'critical', label: '严重' }
+] as const
+
+const showCreateException = ref(false)
+const exceptionCreatePending = ref(false)
+const exceptionResolveId = ref<number | null>(null)
+const exceptionError = ref('')
+const exceptionSuccess = ref('')
+
+const exceptionForm = reactive({
+  category: 'sample_quality',
+  severity: 'medium',
+  title: '',
+  description: '',
+  reported_by: ''
+})
+
 const getTemplateString = (resultType: keyof typeof resultTemplates, key: 'raw' | 'normalized') => {
   return JSON.stringify(resultTemplates[resultType][key], null, 2)
 }
@@ -146,6 +230,20 @@ const resetResultForm = () => {
 const openCreateResult = () => {
   resetResultForm()
   showCreateResult.value = true
+}
+
+const resetExceptionForm = () => {
+  exceptionForm.category = 'sample_quality'
+  exceptionForm.severity = 'medium'
+  exceptionForm.title = ''
+  exceptionForm.description = ''
+  exceptionForm.reported_by = sample.value?.collector?.id ? String(sample.value.collector.id) : ''
+  exceptionError.value = ''
+}
+
+const openCreateException = () => {
+  resetExceptionForm()
+  showCreateException.value = true
 }
 
 watch(() => resultForm.result_type, (value) => {
@@ -227,6 +325,61 @@ const createResult = async () => {
   }
 }
 
+const createException = async () => {
+  exceptionCreatePending.value = true
+  exceptionError.value = ''
+  exceptionSuccess.value = ''
+
+  try {
+    await request<SampleExceptionCreateResponse>('/api/exceptions', {
+      method: 'POST',
+      body: {
+        resource_type: 'sample',
+        resource_id: Number(sampleId.value),
+        category: exceptionForm.category,
+        severity: exceptionForm.severity,
+        title: exceptionForm.title.trim(),
+        ...(exceptionForm.description.trim() ? { description: exceptionForm.description.trim() } : {}),
+        ...(exceptionForm.reported_by ? { reported_by: Number(exceptionForm.reported_by) } : {})
+      }
+    })
+
+    await refreshExceptions()
+    exceptionSuccess.value = '异常已记录，当前样本的异常列表已刷新。'
+    showCreateException.value = false
+  }
+  catch (error) {
+    exceptionError.value = getErrorMessage(error, '异常记录失败，请稍后重试。')
+  }
+  finally {
+    exceptionCreatePending.value = false
+  }
+}
+
+const resolveException = async (id: number) => {
+  exceptionResolveId.value = id
+  exceptionError.value = ''
+  exceptionSuccess.value = ''
+
+  try {
+    await request<SampleExceptionResolveResponse>(`/api/exceptions/${id}/resolve`, {
+      method: 'POST',
+      body: {
+        resolved_by: sample.value?.collector?.id ?? 2
+      }
+    })
+
+    await refreshExceptions()
+    exceptionSuccess.value = '异常已解决，当前异常列表已刷新。'
+  }
+  catch (error) {
+    exceptionError.value = getErrorMessage(error, '异常解决失败，请稍后重试。')
+  }
+  finally {
+    exceptionResolveId.value = null
+  }
+}
+
 const formatDateTime = (value: string | null) => {
   if (!value) {
     return '未设置'
@@ -248,6 +401,25 @@ const stringifyValue = (value: unknown) => {
   }
 
   return JSON.stringify(value, null, 2)
+}
+
+const exceptionCategoryLabel = (value: string) => {
+  return exceptionCategoryOptions.find(option => option.value === value)?.label || value
+}
+
+const exceptionSeverityTone = (value: string) => {
+  switch (value) {
+    case 'low':
+      return 'info'
+    case 'medium':
+      return 'warning'
+    case 'high':
+      return 'error'
+    case 'critical':
+      return 'error'
+    default:
+      return 'neutral'
+  }
 }
 </script>
 
@@ -538,6 +710,206 @@ const stringifyValue = (value: unknown) => {
                       </p>
                       <pre class="mt-1 overflow-x-auto rounded-xl bg-default p-3 text-xs text-toned">{{ stringifyValue(result.normalized_value) }}</pre>
                     </div>
+                  </div>
+                </div>
+              </UCard>
+            </div>
+          </UCard>
+
+          <UCard>
+            <template #header>
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold text-highlighted">
+                    异常处理
+                  </h2>
+                  <p class="mt-1 text-sm text-toned">
+                    围绕当前样本记录质量问题、记录不一致或处理过程问题，并在需要时关闭异常。
+                  </p>
+                </div>
+
+                <UButton icon="i-lucide-triangle-alert" @click="openCreateException">
+                  记录异常
+                </UButton>
+              </div>
+            </template>
+
+            <div v-if="showCreateException" class="mb-4 rounded-2xl border border-default bg-muted/20 p-4">
+              <div class="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h3 class="text-base font-semibold text-highlighted">
+                    记录样本异常
+                  </h3>
+                  <p class="mt-1 text-sm text-toned">
+                    第一版异常固定挂载到当前样本，且只影响异常自身状态，不自动改动样本状态。
+                  </p>
+                </div>
+
+                <UButton type="button" color="neutral" variant="ghost" icon="i-lucide-x" @click="showCreateException = false" />
+              </div>
+
+              <form class="space-y-4" @submit.prevent="createException">
+                <div class="grid gap-4 md:grid-cols-2">
+                  <label class="block space-y-2 text-sm text-toned">
+                    <span class="font-medium text-highlighted">异常分类</span>
+                    <select v-model="exceptionForm.category" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                      <option v-for="option in exceptionCategoryOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </option>
+                    </select>
+                  </label>
+
+                  <label class="block space-y-2 text-sm text-toned">
+                    <span class="font-medium text-highlighted">严重级别</span>
+                    <select v-model="exceptionForm.severity" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                      <option v-for="option in exceptionSeverityOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </option>
+                    </select>
+                  </label>
+                </div>
+
+                <label class="block space-y-2 text-sm text-toned">
+                  <span class="font-medium text-highlighted">异常标题</span>
+                  <input v-model.trim="exceptionForm.title" required type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                </label>
+
+                <label class="block space-y-2 text-sm text-toned">
+                  <span class="font-medium text-highlighted">异常描述（可选）</span>
+                  <textarea v-model.trim="exceptionForm.description" rows="4" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary"></textarea>
+                </label>
+
+                <label class="block space-y-2 text-sm text-toned">
+                  <span class="font-medium text-highlighted">上报人 ID</span>
+                  <input v-model.trim="exceptionForm.reported_by" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                </label>
+
+                <UAlert
+                  v-if="exceptionError"
+                  color="error"
+                  variant="soft"
+                  title="异常处理失败"
+                  :description="exceptionError"
+                />
+
+                <div class="flex flex-wrap gap-3">
+                  <UButton type="submit" :loading="exceptionCreatePending">
+                    提交异常
+                  </UButton>
+                  <UButton type="button" color="neutral" variant="outline" @click="resetExceptionForm()">
+                    重置表单
+                  </UButton>
+                </div>
+              </form>
+            </div>
+
+            <UAlert
+              v-if="exceptionSuccess"
+              class="mb-4"
+              color="success"
+              variant="soft"
+              title="异常处理成功"
+              :description="exceptionSuccess"
+            />
+
+            <UAlert
+              v-if="exceptionsError"
+              color="error"
+              variant="soft"
+              title="异常列表加载失败"
+              :description="'请稍后重试。'"
+            />
+
+            <div v-else-if="exceptionsPending" class="space-y-3">
+              <div class="h-20 rounded-2xl bg-muted/40" />
+              <div class="h-20 rounded-2xl bg-muted/40" />
+            </div>
+
+            <div v-else-if="exceptions.length === 0" class="flex flex-col items-center justify-center gap-3 py-10 text-center">
+              <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <UIcon name="i-lucide-shield-check" class="size-6" />
+              </div>
+              <div>
+                <h3 class="text-base font-semibold text-highlighted">
+                  当前没有异常记录
+                </h3>
+                <p class="mt-1 text-sm text-toned">
+                  如果在结果录入或样本处理过程中发现质量、记录或处理问题，可以在这里登记异常。
+                </p>
+              </div>
+            </div>
+
+            <div v-else class="space-y-4">
+              <UCard v-for="exception in exceptions" :key="exception.id" class="bg-muted/20">
+                <div class="space-y-3 text-sm">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UBadge :color="exceptionSeverityTone(exception.severity)" variant="soft">
+                      {{ exception.severity }}
+                    </UBadge>
+                    <UBadge color="neutral" variant="outline">
+                      {{ exception.status }}
+                    </UBadge>
+                    <span class="text-xs uppercase tracking-[0.18em] text-muted">
+                      {{ exceptionCategoryLabel(exception.category) }}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 class="text-base font-semibold text-highlighted">
+                      {{ exception.title }}
+                    </h3>
+                    <p class="mt-1 text-toned">
+                      {{ exception.description || '当前异常暂无补充说明。' }}
+                    </p>
+                  </div>
+
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                        上报人
+                      </p>
+                      <p class="mt-1 text-toned">
+                        {{ exception.reported_by?.display_name || '未记录' }}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                        创建时间
+                      </p>
+                      <p class="mt-1 text-toned">
+                        {{ formatDateTime(exception.created_at) }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div v-if="exception.status === 'resolved'" class="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                        处理人
+                      </p>
+                      <p class="mt-1 text-toned">
+                        {{ exception.resolved_by?.display_name || '未记录' }}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                        解决时间
+                      </p>
+                      <p class="mt-1 text-toned">
+                        {{ formatDateTime(exception.resolved_at) }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div v-if="exception.status === 'open'" class="flex justify-end">
+                    <UButton
+                      color="neutral"
+                      variant="outline"
+                      :loading="exceptionResolveId === exception.id"
+                      @click="resolveException(exception.id)"
+                    >
+                      解决异常
+                    </UButton>
                   </div>
                 </div>
               </UCard>

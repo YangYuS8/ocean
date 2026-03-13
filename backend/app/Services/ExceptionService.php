@@ -13,7 +13,9 @@ class ExceptionService
     public function index(array $query): array
     {
         [$page, $pageSize, $offset] = $this->pagination($query);
-        $builder = DB::table('exceptions as e')->leftJoin('users as u', 'u.id', '=', 'e.reported_by');
+        $builder = DB::table('exceptions as e')
+            ->leftJoin('users as ru', 'ru.id', '=', 'e.reported_by')
+            ->leftJoin('users as xu', 'xu.id', '=', 'e.resolved_by');
 
         foreach (['resource_type', 'category', 'severity', 'status'] as $field) {
             if (!empty($query[$field])) {
@@ -33,7 +35,7 @@ class ExceptionService
         }
 
         $total = (clone $builder)->count();
-        $rows = $builder->select(['e.*', 'u.display_name as reported_by_name'])
+        $rows = $builder->select(['e.*', 'ru.display_name as reported_by_name', 'xu.display_name as resolved_by_name'])
             ->orderByDesc('e.id')
             ->offset($offset)
             ->limit($pageSize)
@@ -46,11 +48,17 @@ class ExceptionService
             'category' => $row->category,
             'severity' => $row->severity,
             'title' => $row->title,
+            'description' => $row->description,
             'status' => $row->status,
             'reported_by' => $row->reported_by === null ? null : [
                 'id' => (int) $row->reported_by,
                 'display_name' => $row->reported_by_name,
             ],
+            'resolved_by' => $row->resolved_by === null ? null : [
+                'id' => (int) $row->resolved_by,
+                'display_name' => $row->resolved_by_name,
+            ],
+            'resolved_at' => $row->resolved_at,
             'created_at' => $row->created_at,
         ])->all();
 

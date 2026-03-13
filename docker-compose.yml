@@ -23,9 +23,13 @@ services:
 
   php:
     container_name: ocean-php
-    build: ./php
+    build:
+      context: ./backend
+      dockerfile: docker/php/Dockerfile
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.ustc.edu.cn}
     volumes:
-      - ./src:/var/www/html:Z
+      - ./backend:/var/www/html:Z
     environment:
       PHP_IDE_CONFIG: "serverName=php-dev"
       DB_HOST: db
@@ -44,7 +48,7 @@ services:
     ports:
       - "${NGINX_PORT:-8080}:80"
     volumes:
-      - ./src:/var/www/html:Z
+      - ./backend:/var/www/html:Z
       - ./nginx:/etc/nginx/conf.d:ro,Z
     depends_on:
       - frontend

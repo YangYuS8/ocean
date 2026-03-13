@@ -1,12 +1,14 @@
 # Ocean
 
-海洋生态样本与设备巡检管理系统。一个基于 `Nuxt 4 + PHP + MariaDB + Redis + Python` 的多服务开发环境与 MVP 实现基础。
+海洋生态样本与设备巡检管理系统。当前仓库基于 `Nuxt 4 + Laravel + MariaDB + Redis + Python` 组织多服务开发环境，并保留迁移前轻量 PHP 实现作为对照基线。
+
+说明：后端当前已经由 Laravel 承载 P0 API，迁移前的轻量 PHP 实现保留在 `backend/legacy-lightweight/` 仅供对照与回归参考。若要理解这两者的关系，优先参考 `docs/2.9-P0-实现与验证说明.md` 与 `docs/3.0-Laravel-迁移计划.md`。
 
 ## 当前技术栈
 
 - 前端：`Vue 3` + `Nuxt 4` + `Nuxt UI Dashboard`
 - 前端运行方式：`Node/Nitro`，开发端口 `3000`
-- 后端：`PHP-FPM`，通过 Nginx 暴露 `/api/`
+- 后端：`Laravel`（运行于 `PHP-FPM`），通过 Nginx 暴露 `/api/`
 - 数据库：`MariaDB 11`
 - 队列/异步边界：`Redis`
 - 分析环境：`Python 3.12`
@@ -16,7 +18,7 @@
 ## 当前能力概览
 
 - Nuxt 工作台已提供总览、样本管理、巡检任务、仪器监控、统计报表、系统设置等页面壳
-- PHP 已实现 P0 API：
+- Laravel 已实现 P0 API：
   - `GET /api/dashboard/summary`
   - `GET /api/inspection-tasks`
   - `GET /api/inspection-tasks/{id}`
@@ -33,13 +35,12 @@
   - `GET /api/analysis-jobs`
   - `POST /api/analysis-jobs`
   - `GET /api/analysis-jobs/{id}`
-- MariaDB 建表与初始化脚本已落地在 `src/database/`
+- MariaDB 建表与初始化脚本已落地在 `backend/database/`
 
 ## 目录结构
 
 - `frontend/`：Nuxt 4 前端工程
-- `src/`：PHP 应用、P0 API、数据库脚本与执行脚本
-- `php/`：PHP-FPM 镜像配置
+- `backend/`：Laravel 应用、P0 API、migration / seeder、保留的 legacy 基线与 PHP 运行时配置
 - `nginx/`：Nginx 反向代理配置
 - `python/`：Python 分析环境
 - `mysql/`：MariaDB 本地持久化目录
@@ -60,6 +61,7 @@
 - `DB_PORT=3306`
 - `MYSQL_ROOT_PASSWORD=root`
 - `MYSQL_DATABASE=test_db`
+- `DEBIAN_MIRROR=mirrors.ustc.edu.cn`
 
 ### 2. 启动服务
 
@@ -79,11 +81,10 @@ docker compose up -d --build
 
 ### 4. 初始化数据库
 
-启动服务后，在 PHP 容器中执行：
+启动服务后，在 PHP 容器中执行 Laravel migration / seeder：
 
 ```bash
-docker compose exec php php /var/www/html/scripts/migrate.php
-docker compose exec php php /var/www/html/scripts/seed.php
+docker compose exec php php /var/www/html/artisan migrate --seed --force
 ```
 
 ## 常用命令
@@ -142,15 +143,20 @@ pnpm dev
 
 ## 后端与数据库
 
-PHP 代码位于 `src/`。
+Laravel 应用位于 `backend/`。
+
+当前 `backend/legacy-lightweight/` 目录中的轻量 PHP API 骨架仅用于保留迁移前基线能力，不再承载主运行流量。
+
+PHP-FPM 镜像配置位于 `backend/docker/php/`，默认通过 `DEBIAN_MIRROR` 构建参数使用国内 Debian 镜像源优化构建稳定性。
 
 关键文件：
 
-- `src/public/index.php`：HTTP 入口
-- `src/app/Http/ApiKernel.php`：P0 API 路由分发
-- `src/app/Service/P0ApiService.php`：P0 业务逻辑
-- `src/database/schema.sql`：建表脚本
-- `src/database/seed.sql`：初始化数据脚本
+- `backend/public/index.php`：Laravel HTTP 入口
+- `backend/routes/api.php`：P0 API 路由定义
+- `backend/app/Http/Controllers/`：P0 API 控制器
+- `backend/app/Services/`：按领域拆分后的 Laravel 服务层
+- `backend/database/migrations/`：数据库迁移
+- `backend/database/seeders/`：初始化数据
 
 ## 验证示例
 

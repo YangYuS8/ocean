@@ -1,8 +1,5 @@
-# p0-api-foundation 规范
+## MODIFIED Requirements
 
-## 目的
-待定 - 由归档变更 implement-p0-api-and-schema 创建。归档后请更新目的。
-## 需求
 ### 需求:P0 数据库基础必须可初始化
 系统必须在 MariaDB 中提供 P0 阶段所需的核心数据表、索引和基础角色初始化数据，以支撑巡检任务、样本、结果、异常和分析任务的真实落库。
 
@@ -117,3 +114,5 @@
 #### 场景:返回错误响应
 - **当** 请求参数不合法或资源不存在
 - **那么** 系统必须返回包含 `code` 和 `message` 的统一错误结构
+
+## REMOVED Requirements

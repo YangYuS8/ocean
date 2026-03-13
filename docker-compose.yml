@@ -66,9 +66,15 @@ services:
     working_dir: /workspace
     volumes:
       - ./python:/workspace:Z
+      - ./python/.venv:/workspace/.venv:Z
+      - python-uv-cache:/root/.cache/uv
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      UV_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+      UV_INSECURE_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
+      VIRTUAL_ENV: /workspace/.venv
+      PATH: /workspace/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     networks:
       - ocean
 
@@ -114,3 +120,4 @@ networks:
 volumes:
   frontend-node-modules:
   frontend-pnpm-store:
+  python-uv-cache:

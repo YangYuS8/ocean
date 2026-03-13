@@ -73,6 +73,8 @@ docker compose up -d --build
 
 如使用 Podman，建议直接使用 `podman-compose`，不要混用 `podman compose` 委托外部 `docker-compose` 的模式。
 
+Python 服务当前使用 `uv` 管理容器内虚拟环境，首次构建或启动时会在 `python/.venv`（容器内对应 `/workspace/.venv`）创建虚拟环境，并根据 `python/pyproject.toml` 与 `python/uv.lock` 同步依赖。
+
 ### 3. 访问地址
 
 - Nginx 统一入口：`http://127.0.0.1:8080`
@@ -169,6 +171,29 @@ PHP-FPM 镜像配置位于 `backend/docker/php/`，默认通过 `DEBIAN_MIRROR` 
 - `backend/app/Services/`：按领域拆分后的 Laravel 服务层
 - `backend/database/migrations/`：数据库迁移
 - `backend/database/seeders/`：初始化数据
+
+## Python 分析环境
+
+Python 分析目录位于 `python/`，当前通过 `uv` 管理虚拟环境与依赖同步。
+
+关键约定：
+
+- 本地虚拟环境路径：`python/.venv`
+- 容器内虚拟环境路径：`/workspace/.venv`
+- 依赖来源：`python/pyproject.toml` 与 `python/uv.lock`
+- `uv` 默认索引已切换到清华源
+- `python/.venv` 直接挂载进容器，可复用本地虚拟环境，避免每次启动都重新从空环境装依赖
+- `uv` 缓存通过独立 volume 持久化，加快重复构建与重启
+- Python 服务启动时会自动执行 `uv sync --frozen --no-dev`
+
+常用命令：
+
+```bash
+docker compose exec python sh
+docker compose exec python python --version
+docker compose exec python uv pip list
+docker compose exec python uv sync --frozen --no-dev
+```
 
 ## 验证示例
 

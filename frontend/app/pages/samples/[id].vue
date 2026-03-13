@@ -41,23 +41,191 @@ type DetailResponse<T> = {
   data: T
 }
 
+type SampleResultCreateResponse = {
+  data: {
+    id: number
+    sample_id: number
+    status: string
+    created_at: string
+  }
+}
+
 const route = useRoute()
-const { baseURL } = useApiClient()
+const { baseURL, request, getErrorMessage } = useApiClient()
 
 const sampleId = computed(() => String(route.params.id))
 
-const { data, pending, error } = await useFetch<DetailResponse<SampleDetail>>(() => `/api/samples/${sampleId.value}`, {
+const { data, pending, error, refresh: refreshSample } = await useFetch<DetailResponse<SampleDetail>>(() => `/api/samples/${sampleId.value}`, {
   baseURL,
   watch: [sampleId]
 })
 
-const { data: resultsData, pending: resultsPending, error: resultsError } = await useFetch<DetailResponse<SampleResult[]>>(() => `/api/samples/${sampleId.value}/results`, {
+const { data: resultsData, pending: resultsPending, error: resultsError, refresh: refreshResults } = await useFetch<DetailResponse<SampleResult[]>>(() => `/api/samples/${sampleId.value}/results`, {
   baseURL,
   watch: [sampleId]
 })
 
 const sample = computed(() => data.value?.data ?? null)
 const results = computed(() => resultsData.value?.data ?? [])
+
+const resultTypeOptions = [
+  {
+    value: 'salinity_test',
+    label: '盐度检测'
+  },
+  {
+    value: 'ph_test',
+    label: 'pH 检测'
+  }
+] as const
+
+const resultTemplates = {
+  salinity_test: {
+    raw: {
+      salinity: 31.2,
+      unit: 'ppt'
+    },
+    normalized: {
+      salinity: 31.2,
+      unit: 'ppt',
+      range_flag: 'normal'
+    },
+    conclusion: '盐度正常'
+  },
+  ph_test: {
+    raw: {
+      ph: 8.1,
+      unit: 'pH'
+    },
+    normalized: {
+      ph: 8.1,
+      unit: 'pH',
+      range_flag: 'normal'
+    },
+    conclusion: 'pH 在正常范围内'
+  }
+} as const
+
+const showCreateResult = ref(false)
+const createPending = ref(false)
+const createSuccess = ref('')
+const createError = ref('')
+const rawValueError = ref('')
+const normalizedValueError = ref('')
+
+const resultForm = reactive({
+  result_type: 'salinity_test',
+  entered_by: '',
+  raw_value: '',
+  normalized_value: '',
+  conclusion: '',
+  notes: ''
+})
+
+const getTemplateString = (resultType: keyof typeof resultTemplates, key: 'raw' | 'normalized') => {
+  return JSON.stringify(resultTemplates[resultType][key], null, 2)
+}
+
+const applyTemplate = (resultType: keyof typeof resultTemplates) => {
+  resultForm.raw_value = getTemplateString(resultType, 'raw')
+  resultForm.normalized_value = getTemplateString(resultType, 'normalized')
+  resultForm.conclusion = resultTemplates[resultType].conclusion
+}
+
+const resetResultForm = () => {
+  resultForm.result_type = 'salinity_test'
+  resultForm.entered_by = sample.value?.collector?.id ? String(sample.value.collector.id) : ''
+  resultForm.notes = ''
+  applyTemplate('salinity_test')
+  createError.value = ''
+  createSuccess.value = ''
+  rawValueError.value = ''
+  normalizedValueError.value = ''
+}
+
+const openCreateResult = () => {
+  resetResultForm()
+  showCreateResult.value = true
+}
+
+watch(() => resultForm.result_type, (value) => {
+  applyTemplate(value as keyof typeof resultTemplates)
+  rawValueError.value = ''
+  normalizedValueError.value = ''
+})
+
+const parseJsonObject = (value: string, fieldLabel: string) => {
+  if (!value.trim()) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(value)
+
+    if (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object') {
+      throw new Error(`${fieldLabel}必须是 JSON 对象。`)
+    }
+
+    return parsed
+  }
+  catch (error) {
+    throw new Error(error instanceof Error ? error.message : `${fieldLabel}不是合法 JSON。`)
+  }
+}
+
+const createResult = async () => {
+  createPending.value = true
+  createError.value = ''
+  createSuccess.value = ''
+  rawValueError.value = ''
+  normalizedValueError.value = ''
+
+  let rawValue: Record<string, unknown> | null = null
+  let normalizedValue: Record<string, unknown> | null = null
+
+  try {
+    rawValue = parseJsonObject(resultForm.raw_value, '原始结果')
+  }
+  catch (error) {
+    rawValueError.value = error instanceof Error ? error.message : '原始结果不是合法 JSON。'
+  }
+
+  try {
+    normalizedValue = parseJsonObject(resultForm.normalized_value, '归一化结果')
+  }
+  catch (error) {
+    normalizedValueError.value = error instanceof Error ? error.message : '归一化结果不是合法 JSON。'
+  }
+
+  if (rawValueError.value || normalizedValueError.value) {
+    createPending.value = false
+    return
+  }
+
+  try {
+    await request<SampleResultCreateResponse>(`/api/samples/${sampleId.value}/results`, {
+      method: 'POST',
+      body: {
+        result_type: resultForm.result_type,
+        ...(rawValue ? { raw_value: rawValue } : {}),
+        ...(normalizedValue ? { normalized_value: normalizedValue } : {}),
+        ...(resultForm.conclusion.trim() ? { conclusion: resultForm.conclusion.trim() } : {}),
+        ...(resultForm.entered_by ? { entered_by: Number(resultForm.entered_by) } : {}),
+        ...(resultForm.notes.trim() ? { notes: resultForm.notes.trim() } : {})
+      }
+    })
+
+    await Promise.all([refreshResults(), refreshSample()])
+    createSuccess.value = '结果已录入，样本处理视图已刷新。'
+    showCreateResult.value = false
+  }
+  catch (error) {
+    createError.value = getErrorMessage(error, '结果录入失败，请稍后重试。')
+  }
+  finally {
+    createPending.value = false
+  }
+}
 
 const formatDateTime = (value: string | null) => {
   if (!value) {
@@ -171,15 +339,124 @@ const stringifyValue = (value: unknown) => {
 
           <UCard>
             <template #header>
-              <div>
-                <h2 class="text-lg font-semibold text-highlighted">
-                  检测结果
-                </h2>
-                <p class="mt-1 text-sm text-toned">
-                  当前先接入只读结果列表，为后续新增结果、异常与分析任务挂载操作入口。
-                </p>
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold text-highlighted">
+                    检测结果
+                  </h2>
+                  <p class="mt-1 text-sm text-toned">
+                    结果录入现在直接附着在样本详情内完成，保持 MVP 处理链最短闭环。
+                  </p>
+                </div>
+
+                <UButton icon="i-lucide-plus" @click="openCreateResult">
+                  新增结果
+                </UButton>
               </div>
             </template>
+
+            <div v-if="showCreateResult" class="mb-4 rounded-2xl border border-default bg-muted/20 p-4">
+              <div class="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h3 class="text-base font-semibold text-highlighted">
+                    录入实验结果
+                  </h3>
+                  <p class="mt-1 text-sm text-toned">
+                    当前先支持 `salinity_test` 与 `ph_test`，并通过 JSON 模板降低录入门槛。
+                  </p>
+                </div>
+
+                <UButton type="button" color="neutral" variant="ghost" icon="i-lucide-x" @click="showCreateResult = false" />
+              </div>
+
+              <form class="space-y-4" @submit.prevent="createResult">
+                <div class="grid gap-4 md:grid-cols-2">
+                  <label class="block space-y-2 text-sm text-toned">
+                    <span class="font-medium text-highlighted">结果类型</span>
+                    <select v-model="resultForm.result_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                      <option v-for="option in resultTypeOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </option>
+                    </select>
+                  </label>
+
+                  <label class="block space-y-2 text-sm text-toned">
+                    <span class="font-medium text-highlighted">录入人 ID</span>
+                    <input v-model.trim="resultForm.entered_by" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  </label>
+                </div>
+
+                <label class="block space-y-2 text-sm text-toned">
+                  <span class="font-medium text-highlighted">结论</span>
+                  <input v-model.trim="resultForm.conclusion" type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                </label>
+
+                <div class="grid gap-4 xl:grid-cols-2">
+                  <label class="block space-y-2 text-sm text-toned">
+                    <span class="flex items-center justify-between gap-3 font-medium text-highlighted">
+                      <span>原始结果 JSON</span>
+                      <UButton type="button" color="neutral" variant="outline" size="xs" @click="resultForm.raw_value = getTemplateString(resultForm.result_type as keyof typeof resultTemplates, 'raw')">
+                        恢复模板
+                      </UButton>
+                    </span>
+                    <textarea v-model="resultForm.raw_value" rows="9" class="w-full rounded-2xl border border-default bg-default px-3 py-2 font-mono text-xs text-default outline-none transition focus:border-primary"></textarea>
+                    <p class="text-xs text-muted">
+                      {{ resultForm.result_type === 'salinity_test' ? '推荐字段：salinity, unit' : '推荐字段：ph, unit' }}
+                    </p>
+                    <p v-if="rawValueError" class="text-xs text-error">
+                      {{ rawValueError }}
+                    </p>
+                  </label>
+
+                  <label class="block space-y-2 text-sm text-toned">
+                    <span class="flex items-center justify-between gap-3 font-medium text-highlighted">
+                      <span>归一化结果 JSON（可选）</span>
+                      <UButton type="button" color="neutral" variant="outline" size="xs" @click="resultForm.normalized_value = getTemplateString(resultForm.result_type as keyof typeof resultTemplates, 'normalized')">
+                        恢复模板
+                      </UButton>
+                    </span>
+                    <textarea v-model="resultForm.normalized_value" rows="9" class="w-full rounded-2xl border border-default bg-default px-3 py-2 font-mono text-xs text-default outline-none transition focus:border-primary"></textarea>
+                    <p class="text-xs text-muted">
+                      可留空；若填写，建议补充 `range_flag` 字段。
+                    </p>
+                    <p v-if="normalizedValueError" class="text-xs text-error">
+                      {{ normalizedValueError }}
+                    </p>
+                  </label>
+                </div>
+
+                <label class="block space-y-2 text-sm text-toned">
+                  <span class="font-medium text-highlighted">备注（可选）</span>
+                  <textarea v-model.trim="resultForm.notes" rows="3" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary"></textarea>
+                </label>
+
+                <UAlert
+                  v-if="createError"
+                  color="error"
+                  variant="soft"
+                  title="结果录入失败"
+                  :description="createError"
+                />
+
+                <div class="flex flex-wrap gap-3">
+                  <UButton type="submit" :loading="createPending">
+                    提交结果
+                  </UButton>
+                  <UButton type="button" color="neutral" variant="outline" @click="resetResultForm()">
+                    重置表单
+                  </UButton>
+                </div>
+              </form>
+            </div>
+
+            <UAlert
+              v-if="createSuccess"
+              class="mb-4"
+              color="success"
+              variant="soft"
+              title="结果录入成功"
+              :description="createSuccess"
+            />
 
             <UAlert
               v-if="resultsError"
@@ -282,6 +559,15 @@ const stringifyValue = (value: unknown) => {
             </template>
 
             <div class="flex flex-col gap-3">
+              <div class="rounded-2xl bg-primary/5 px-4 py-3 text-sm text-toned">
+                <p>
+                  当前样本状态：<span class="font-semibold text-highlighted">{{ sample.status }}</span>
+                </p>
+                <p class="mt-1">
+                  结果录入成功后，`registered` / `received` 样本会自动推进到 `testing`。
+                </p>
+              </div>
+
               <UButton
                 v-if="sample.inspection_task_id"
                 :to="`/inspections/${sample.inspection_task_id}`"

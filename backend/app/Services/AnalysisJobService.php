@@ -44,6 +44,8 @@ class AnalysisJobService
             'sample_id' => (int) $row->sample_id,
             'job_type' => $row->job_type,
             'status' => $row->status,
+            'result_summary' => $row->result_summary,
+            'error_message' => $row->error_message,
             'queued_by' => $row->queued_by === null ? null : [
                 'id' => (int) $row->queued_by,
                 'display_name' => $row->queued_by_name,

@@ -96,6 +96,30 @@ type SampleExceptionResolveResponse = {
   }
 }
 
+type AnalysisJob = {
+  id: number
+  sample_id: number
+  job_type: string
+  status: string
+  result_summary: string | null
+  error_message: string | null
+  queued_by: null | {
+    id: number
+    display_name: string
+  }
+  queued_at: string | null
+}
+
+type AnalysisJobCreateResponse = {
+  data: {
+    id: number
+    sample_id: number
+    job_type: string
+    status: string
+    queued_at: string
+  }
+}
+
 const route = useRoute()
 const { baseURL, request, getErrorMessage } = useApiClient()
 
@@ -121,9 +145,19 @@ const { data: exceptionsData, pending: exceptionsPending, error: exceptionsError
   query: exceptionQuery
 })
 
+const analysisJobQuery = computed(() => ({
+  sample_id: Number(sampleId.value)
+}))
+
+const { data: analysisJobsData, pending: analysisJobsPending, error: analysisJobsError, refresh: refreshAnalysisJobs } = await useFetch<PaginatedResponse<AnalysisJob>>('/api/analysis-jobs', {
+  baseURL,
+  query: analysisJobQuery
+})
+
 const sample = computed(() => data.value?.data ?? null)
 const results = computed(() => resultsData.value?.data ?? [])
 const exceptions = computed(() => exceptionsData.value?.data ?? [])
+const analysisJobs = computed(() => analysisJobsData.value?.data ?? [])
 
 const resultTypeOptions = [
   {
@@ -206,6 +240,21 @@ const exceptionForm = reactive({
   reported_by: ''
 })
 
+const analysisJobTypeOptions = [
+  { value: 'quality_assessment', label: '质量评估' },
+  { value: 'anomaly_scan', label: '异常扫描' }
+] as const
+
+const showCreateAnalysisJob = ref(false)
+const analysisJobCreatePending = ref(false)
+const analysisJobError = ref('')
+const analysisJobSuccess = ref('')
+
+const analysisJobForm = reactive({
+  job_type: 'quality_assessment',
+  queued_by: ''
+})
+
 const getTemplateString = (resultType: keyof typeof resultTemplates, key: 'raw' | 'normalized') => {
   return JSON.stringify(resultTemplates[resultType][key], null, 2)
 }
@@ -244,6 +293,17 @@ const resetExceptionForm = () => {
 const openCreateException = () => {
   resetExceptionForm()
   showCreateException.value = true
+}
+
+const resetAnalysisJobForm = () => {
+  analysisJobForm.job_type = 'quality_assessment'
+  analysisJobForm.queued_by = sample.value?.collector?.id ? String(sample.value.collector.id) : ''
+  analysisJobError.value = ''
+}
+
+const openCreateAnalysisJob = () => {
+  resetAnalysisJobForm()
+  showCreateAnalysisJob.value = true
 }
 
 watch(() => resultForm.result_type, (value) => {
@@ -380,6 +440,33 @@ const resolveException = async (id: number) => {
   }
 }
 
+const createAnalysisJob = async () => {
+  analysisJobCreatePending.value = true
+  analysisJobError.value = ''
+  analysisJobSuccess.value = ''
+
+  try {
+    await request<AnalysisJobCreateResponse>('/api/analysis-jobs', {
+      method: 'POST',
+      body: {
+        sample_id: Number(sampleId.value),
+        job_type: analysisJobForm.job_type,
+        ...(analysisJobForm.queued_by ? { queued_by: Number(analysisJobForm.queued_by) } : {})
+      }
+    })
+
+    await refreshAnalysisJobs()
+    analysisJobSuccess.value = '分析任务已发起，当前样本的任务列表已刷新。'
+    showCreateAnalysisJob.value = false
+  }
+  catch (error) {
+    analysisJobError.value = getErrorMessage(error, '分析任务发起失败，请稍后重试。')
+  }
+  finally {
+    analysisJobCreatePending.value = false
+  }
+}
+
 const formatDateTime = (value: string | null) => {
   if (!value) {
     return '未设置'
@@ -416,6 +503,25 @@ const exceptionSeverityTone = (value: string) => {
     case 'high':
       return 'error'
     case 'critical':
+      return 'error'
+    default:
+      return 'neutral'
+  }
+}
+
+const analysisJobTypeLabel = (value: string) => {
+  return analysisJobTypeOptions.find(option => option.value === value)?.label || value
+}
+
+const analysisJobStatusTone = (value: string) => {
+  switch (value) {
+    case 'queued':
+      return 'warning'
+    case 'running':
+      return 'primary'
+    case 'succeeded':
+      return 'success'
+    case 'failed':
       return 'error'
     default:
       return 'neutral'
@@ -910,6 +1016,172 @@ const exceptionSeverityTone = (value: string) => {
                     >
                       解决异常
                     </UButton>
+                  </div>
+                </div>
+              </UCard>
+            </div>
+          </UCard>
+
+          <UCard>
+            <template #header>
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold text-highlighted">
+                    分析任务
+                  </h2>
+                  <p class="mt-1 text-sm text-toned">
+                    围绕当前样本发起质量评估或异常扫描，并在这里查看任务状态。
+                  </p>
+                </div>
+
+                <UButton icon="i-lucide-sparkles" @click="openCreateAnalysisJob">
+                  发起分析
+                </UButton>
+              </div>
+            </template>
+
+            <div v-if="showCreateAnalysisJob" class="mb-4 rounded-2xl border border-default bg-muted/20 p-4">
+              <div class="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h3 class="text-base font-semibold text-highlighted">
+                    发起分析任务
+                  </h3>
+                  <p class="mt-1 text-sm text-toned">
+                    第一版只支持最小任务类型集合，参数系统后续再扩展。
+                  </p>
+                </div>
+
+                <UButton type="button" color="neutral" variant="ghost" icon="i-lucide-x" @click="showCreateAnalysisJob = false" />
+              </div>
+
+              <form class="space-y-4" @submit.prevent="createAnalysisJob">
+                <div class="grid gap-4 md:grid-cols-2">
+                  <label class="block space-y-2 text-sm text-toned">
+                    <span class="font-medium text-highlighted">分析类型</span>
+                    <select v-model="analysisJobForm.job_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                      <option v-for="option in analysisJobTypeOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </option>
+                    </select>
+                  </label>
+
+                  <label class="block space-y-2 text-sm text-toned">
+                    <span class="font-medium text-highlighted">发起人 ID</span>
+                    <input v-model.trim="analysisJobForm.queued_by" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  </label>
+                </div>
+
+                <div class="rounded-2xl bg-primary/5 px-4 py-3 text-sm text-toned">
+                  <p>
+                    当前样本上下文：<span class="font-semibold text-highlighted">#{{ sample.id }}</span>
+                  </p>
+                  <p class="mt-1">
+                    任务创建后会进入 <span class="font-semibold text-highlighted">queued</span> 状态，并计入首页分析任务摘要。
+                  </p>
+                </div>
+
+                <UAlert
+                  v-if="analysisJobError"
+                  color="error"
+                  variant="soft"
+                  title="分析任务发起失败"
+                  :description="analysisJobError"
+                />
+
+                <div class="flex flex-wrap gap-3">
+                  <UButton type="submit" :loading="analysisJobCreatePending">
+                    提交任务
+                  </UButton>
+                  <UButton type="button" color="neutral" variant="outline" @click="resetAnalysisJobForm()">
+                    重置表单
+                  </UButton>
+                </div>
+              </form>
+            </div>
+
+            <UAlert
+              v-if="analysisJobSuccess"
+              class="mb-4"
+              color="success"
+              variant="soft"
+              title="分析任务已创建"
+              :description="analysisJobSuccess"
+            />
+
+            <UAlert
+              v-if="analysisJobsError"
+              color="error"
+              variant="soft"
+              title="分析任务列表加载失败"
+              :description="'请稍后重试。'"
+            />
+
+            <div v-else-if="analysisJobsPending" class="space-y-3">
+              <div class="h-20 rounded-2xl bg-muted/40" />
+              <div class="h-20 rounded-2xl bg-muted/40" />
+            </div>
+
+            <div v-else-if="analysisJobs.length === 0" class="flex flex-col items-center justify-center gap-3 py-10 text-center">
+              <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <UIcon name="i-lucide-sparkles" class="size-6" />
+              </div>
+              <div>
+                <h3 class="text-base font-semibold text-highlighted">
+                  当前没有分析任务
+                </h3>
+                <p class="mt-1 text-sm text-toned">
+                  当需要对当前样本进行质量评估或异常扫描时，可以在这里直接发起分析任务。
+                </p>
+              </div>
+            </div>
+
+            <div v-else class="space-y-4">
+              <UCard v-for="job in analysisJobs" :key="job.id" class="bg-muted/20">
+                <div class="space-y-3 text-sm">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UBadge :color="analysisJobStatusTone(job.status)" variant="soft">
+                      {{ job.status }}
+                    </UBadge>
+                    <span class="text-xs uppercase tracking-[0.18em] text-muted">
+                      {{ analysisJobTypeLabel(job.job_type) }}
+                    </span>
+                  </div>
+
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                        发起人
+                      </p>
+                      <p class="mt-1 text-toned">
+                        {{ job.queued_by?.display_name || '未记录' }}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                        入队时间
+                      </p>
+                      <p class="mt-1 text-toned">
+                        {{ formatDateTime(job.queued_at) }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div v-if="job.status === 'succeeded' && job.result_summary">
+                    <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                      结果摘要
+                    </p>
+                    <p class="mt-1 text-toned">
+                      {{ job.result_summary }}
+                    </p>
+                  </div>
+
+                  <div v-if="job.status === 'failed' && job.error_message">
+                    <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                      失败原因
+                    </p>
+                    <p class="mt-1 text-error">
+                      {{ job.error_message }}
+                    </p>
                   </div>
                 </div>
               </UCard>

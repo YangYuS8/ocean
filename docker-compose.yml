@@ -85,7 +85,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-test_db}
     volumes:
-      - ./mysql:/var/lib/mysql:Z
+      - mariadb-data:/var/lib/mysql
     ports:
       - "${DB_PORT:-3306}:3306"
     networks:
@@ -94,6 +94,8 @@ services:
   redis:
     container_name: ocean-redis
     image: docker.io/library/redis:7-alpine
+    volumes:
+      - redis-data:/data
     ports:
       - "${REDIS_PORT:-6379}:6379"
     networks:
@@ -119,5 +121,12 @@ networks:
 
 volumes:
   frontend-node-modules:
+    name: ocean-frontend-node-modules
   frontend-pnpm-store:
+    name: ocean-frontend-pnpm-store
   python-uv-cache:
+    name: ocean-python-uv-cache
+  mariadb-data:
+    name: ocean-mariadb-data
+  redis-data:
+    name: ocean-redis-data

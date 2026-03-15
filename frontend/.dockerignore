@@ -1,0 +1,9 @@
+node_modules
+.pnpm-store
+.nuxt
+.output
+.git
+.gitignore
+*.log
+*.tmp
+.DS_Store

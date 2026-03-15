@@ -43,7 +43,6 @@
 - `backend/`：Laravel 应用、P0 API、migration / seeder、保留的 legacy 基线与 PHP 运行时配置
 - `nginx/`：Nginx 反向代理配置
 - `python/`：Python 分析环境
-- `mysql/`：MariaDB 本地持久化目录
 - `docs/`：项目设计、API、数据表与实现说明
 - `openspec/`：OpenSpec 规范、变更与归档记录
 
@@ -84,6 +83,11 @@ Python 服务当前使用 `uv` 管理容器内虚拟环境，首次构建或启�
   - 密码：`root`
 
 ### 4. 初始化数据库
+
+MariaDB 与 Redis 当前都使用 Docker named volumes 持久化：
+
+- `ocean-mariadb-data`：MariaDB 数据
+- `ocean-redis-data`：Redis 数据
 
 启动服务后，在 PHP 容器中执行 Laravel migration / seeder：
 

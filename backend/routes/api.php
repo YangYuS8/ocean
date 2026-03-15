@@ -29,3 +29,8 @@ Route::post('/exceptions/{id}/resolve', [ExceptionController::class, 'resolve'])
 Route::get('/analysis-jobs', [AnalysisJobController::class, 'index']);
 Route::post('/analysis-jobs', [AnalysisJobController::class, 'store']);
 Route::get('/analysis-jobs/{id}', [AnalysisJobController::class, 'show']);
+Route::post('/analysis-jobs/{id}/start', [AnalysisJobController::class, 'start']);
+Route::post('/analysis-jobs/{id}/succeed', [AnalysisJobController::class, 'succeed']);
+Route::post('/analysis-jobs/{id}/fail', [AnalysisJobController::class, 'fail']);
+Route::post('/analysis-jobs/{id}/cancel', [AnalysisJobController::class, 'cancel']);
+Route::post('/analysis-jobs/{id}/retry', [AnalysisJobController::class, 'retry']);

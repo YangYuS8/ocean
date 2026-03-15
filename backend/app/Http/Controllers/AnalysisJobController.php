@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\FailAnalysisJobRequest;
+use App\Http\Requests\SucceedAnalysisJobRequest;
 use App\Http\Requests\StoreAnalysisJobRequest;
 use App\Services\AnalysisJobService;
 use App\Support\ApiResponse;
@@ -28,5 +30,30 @@ class AnalysisJobController extends Controller
     public function show(int $id)
     {
         return ApiResponse::success($this->service->show($id));
+    }
+
+    public function start(int $id)
+    {
+        return ApiResponse::success($this->service->start($id));
+    }
+
+    public function succeed(int $id, SucceedAnalysisJobRequest $request)
+    {
+        return ApiResponse::success($this->service->succeed($id, $request->validated()));
+    }
+
+    public function fail(int $id, FailAnalysisJobRequest $request)
+    {
+        return ApiResponse::success($this->service->fail($id, $request->validated()));
+    }
+
+    public function cancel(int $id)
+    {
+        return ApiResponse::success($this->service->cancel($id));
+    }
+
+    public function retry(int $id)
+    {
+        return ApiResponse::success($this->service->retry($id), 201);
     }
 }

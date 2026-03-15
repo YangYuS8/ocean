@@ -108,6 +108,8 @@ type AnalysisJob = {
     display_name: string
   }
   queued_at: string | null
+  started_at: string | null
+  finished_at: string | null
 }
 
 type AnalysisJobCreateResponse = {
@@ -117,6 +119,20 @@ type AnalysisJobCreateResponse = {
     job_type: string
     status: string
     queued_at: string
+  }
+}
+
+type AnalysisJobActionResponse = {
+  data: {
+    id: number
+    sample_id?: number
+    job_type?: string
+    status: string
+    queued_at?: string
+    started_at?: string
+    finished_at?: string
+    result_summary?: string | null
+    error_message?: string | null
   }
 }
 
@@ -249,6 +265,7 @@ const showCreateAnalysisJob = ref(false)
 const analysisJobCreatePending = ref(false)
 const analysisJobError = ref('')
 const analysisJobSuccess = ref('')
+const analysisJobActionPendingId = ref<number | null>(null)
 
 const analysisJobForm = reactive({
   job_type: 'quality_assessment',
@@ -467,6 +484,74 @@ const createAnalysisJob = async () => {
   }
 }
 
+const getAnalysisJobSuccessSummary = (job: AnalysisJob) => {
+  if (job.job_type === 'quality_assessment') {
+    return '质量评估已完成，可结合结果摘要继续录入样本结果或补充异常记录。'
+  }
+
+  return '异常扫描已完成，可根据扫描结果继续录入结果或判断是否需要记录异常。'
+}
+
+const getAnalysisJobFailureMessage = (job: AnalysisJob) => {
+  if (job.job_type === 'quality_assessment') {
+    return '质量评估未完成，请稍后重新发起，或根据现场情况补充异常记录。'
+  }
+
+  return '异常扫描未完成，请稍后重新发起，或先记录当前样本的异常情况。'
+}
+
+const runAnalysisJobAction = async (jobId: number, path: string, successMessage: string, body?: Record<string, unknown>) => {
+  analysisJobActionPendingId.value = jobId
+  analysisJobError.value = ''
+  analysisJobSuccess.value = ''
+
+  try {
+    await request<AnalysisJobActionResponse>(path, {
+      method: 'POST',
+      ...(body ? { body } : {})
+    })
+
+    await refreshAnalysisJobs()
+    analysisJobSuccess.value = successMessage
+  }
+  catch (error) {
+    analysisJobError.value = getErrorMessage(error, '分析任务操作失败，请稍后重试。')
+  }
+  finally {
+    analysisJobActionPendingId.value = null
+  }
+}
+
+const startAnalysisJob = async (job: AnalysisJob) => {
+  await runAnalysisJobAction(job.id, `/api/analysis-jobs/${job.id}/start`, '分析任务已开始执行，任务列表已刷新。')
+}
+
+const succeedAnalysisJob = async (job: AnalysisJob) => {
+  await runAnalysisJobAction(
+    job.id,
+    `/api/analysis-jobs/${job.id}/succeed`,
+    '分析任务已标记为成功，结果摘要与任务列表已刷新。',
+    { result_summary: getAnalysisJobSuccessSummary(job) }
+  )
+}
+
+const failAnalysisJob = async (job: AnalysisJob) => {
+  await runAnalysisJobAction(
+    job.id,
+    `/api/analysis-jobs/${job.id}/fail`,
+    '分析任务已标记为失败，失败原因与任务列表已刷新。',
+    { error_message: getAnalysisJobFailureMessage(job) }
+  )
+}
+
+const cancelAnalysisJob = async (job: AnalysisJob) => {
+  await runAnalysisJobAction(job.id, `/api/analysis-jobs/${job.id}/cancel`, '分析任务已取消，任务列表已刷新。')
+}
+
+const retryAnalysisJob = async (job: AnalysisJob) => {
+  await runAnalysisJobAction(job.id, `/api/analysis-jobs/${job.id}/retry`, '分析任务已重新发起，原失败记录已保留。')
+}
+
 const formatDateTime = (value: string | null) => {
   if (!value) {
     return '未设置'
@@ -525,6 +610,23 @@ const analysisJobStatusTone = (value: string) => {
       return 'error'
     default:
       return 'neutral'
+  }
+}
+
+const analysisJobStatusLabel = (value: string) => {
+  switch (value) {
+    case 'queued':
+      return '待执行'
+    case 'running':
+      return '执行中'
+    case 'succeeded':
+      return '已完成'
+    case 'failed':
+      return '失败'
+    case 'cancelled':
+      return '已取消'
+    default:
+      return value
   }
 }
 </script>
@@ -1140,14 +1242,17 @@ const analysisJobStatusTone = (value: string) => {
                 <div class="space-y-3 text-sm">
                   <div class="flex flex-wrap items-center gap-2">
                     <UBadge :color="analysisJobStatusTone(job.status)" variant="soft">
-                      {{ job.status }}
+                      {{ analysisJobStatusLabel(job.status) }}
                     </UBadge>
                     <span class="text-xs uppercase tracking-[0.18em] text-muted">
                       {{ analysisJobTypeLabel(job.job_type) }}
                     </span>
+                    <span class="text-xs text-muted">
+                      #{{ job.id }}
+                    </span>
                   </div>
 
-                  <div class="grid gap-3 md:grid-cols-2">
+                  <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div>
                       <p class="text-xs uppercase tracking-[0.18em] text-muted">
                         发起人
@@ -1164,6 +1269,22 @@ const analysisJobStatusTone = (value: string) => {
                         {{ formatDateTime(job.queued_at) }}
                       </p>
                     </div>
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                        开始时间
+                      </p>
+                      <p class="mt-1 text-toned">
+                        {{ formatDateTime(job.started_at) }}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                        完成时间
+                      </p>
+                      <p class="mt-1 text-toned">
+                        {{ formatDateTime(job.finished_at) }}
+                      </p>
+                    </div>
                   </div>
 
                   <div v-if="job.status === 'succeeded' && job.result_summary">
@@ -1173,6 +1294,17 @@ const analysisJobStatusTone = (value: string) => {
                     <p class="mt-1 text-toned">
                       {{ job.result_summary }}
                     </p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <UButton color="primary" variant="soft" icon="i-lucide-flask-conical" @click="openCreateResult()">
+                        去录入结果
+                      </UButton>
+                      <UButton color="warning" variant="soft" icon="i-lucide-alert-triangle" @click="openCreateException()">
+                        记录异常
+                      </UButton>
+                      <span class="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs text-toned">
+                        也可以暂不处理，稍后回到该样本继续判断。
+                      </span>
+                    </div>
                   </div>
 
                   <div v-if="job.status === 'failed' && job.error_message">
@@ -1182,6 +1314,66 @@ const analysisJobStatusTone = (value: string) => {
                     <p class="mt-1 text-error">
                       {{ job.error_message }}
                     </p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <UButton
+                        color="primary"
+                        variant="soft"
+                        icon="i-lucide-rotate-ccw"
+                        :loading="analysisJobActionPendingId === job.id"
+                        @click="retryAnalysisJob(job)"
+                      >
+                        重新发起分析
+                      </UButton>
+                      <UButton color="warning" variant="soft" icon="i-lucide-alert-triangle" @click="openCreateException()">
+                        记录异常
+                      </UButton>
+                    </div>
+                  </div>
+
+                  <div v-if="job.status === 'queued'" class="flex flex-wrap gap-2">
+                    <UButton
+                      color="primary"
+                      variant="soft"
+                      icon="i-lucide-play"
+                      :loading="analysisJobActionPendingId === job.id"
+                      @click="startAnalysisJob(job)"
+                    >
+                      开始执行
+                    </UButton>
+                    <UButton
+                      color="neutral"
+                      variant="outline"
+                      icon="i-lucide-ban"
+                      :loading="analysisJobActionPendingId === job.id"
+                      @click="cancelAnalysisJob(job)"
+                    >
+                      取消任务
+                    </UButton>
+                  </div>
+
+                  <div v-if="job.status === 'running'" class="flex flex-wrap gap-2">
+                    <UButton
+                      color="success"
+                      variant="soft"
+                      icon="i-lucide-check"
+                      :loading="analysisJobActionPendingId === job.id"
+                      @click="succeedAnalysisJob(job)"
+                    >
+                      标记成功
+                    </UButton>
+                    <UButton
+                      color="error"
+                      variant="soft"
+                      icon="i-lucide-x"
+                      :loading="analysisJobActionPendingId === job.id"
+                      @click="failAnalysisJob(job)"
+                    >
+                      标记失败
+                    </UButton>
+                  </div>
+
+                  <div v-if="job.status === 'cancelled'" class="rounded-2xl bg-muted/50 px-4 py-3 text-xs text-toned">
+                    该分析任务已取消，不会继续执行。若仍需分析当前样本，可重新发起新的分析任务。
                   </div>
                 </div>
               </UCard>

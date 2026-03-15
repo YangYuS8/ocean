@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { buildSampleWorkspaceGuidance } from '../../utils/sampleWorkspaceGuidance.js'
+
 type SampleDetail = {
   id: number
   sample_code: string
@@ -174,6 +176,15 @@ const sample = computed(() => data.value?.data ?? null)
 const results = computed(() => resultsData.value?.data ?? [])
 const exceptions = computed(() => exceptionsData.value?.data ?? [])
 const analysisJobs = computed(() => analysisJobsData.value?.data ?? [])
+const openExceptions = computed(() => exceptions.value.filter(item => item.status === 'open'))
+const failedAnalysisJobs = computed(() => analysisJobs.value.filter(item => item.status === 'failed'))
+const activeAnalysisJobs = computed(() => analysisJobs.value.filter(item => item.status === 'queued' || item.status === 'running'))
+const workspaceGuidance = computed(() => sample.value ? buildSampleWorkspaceGuidance({
+  sample: sample.value,
+  results: results.value,
+  exceptions: exceptions.value,
+  analysisJobs: analysisJobs.value
+}) : null)
 
 const resultTypeOptions = [
   {
@@ -627,6 +638,63 @@ const analysisJobStatusLabel = (value: string) => {
       return '已取消'
     default:
       return value
+  }
+}
+
+const workspaceGuidanceActionLabel = (action: string) => {
+  switch (action) {
+    case 'result':
+      return '去录入结果'
+    case 'exception':
+      return '去处理异常'
+    case 'retry-analysis':
+      return '重新发起分析'
+    case 'wait':
+      return '刷新分析状态'
+    default:
+      return '继续处理样本'
+  }
+}
+
+const workspaceGuidanceActionIcon = (action: string) => {
+  switch (action) {
+    case 'result':
+      return 'i-lucide-flask-conical'
+    case 'exception':
+      return 'i-lucide-alert-triangle'
+    case 'retry-analysis':
+      return 'i-lucide-rotate-ccw'
+    case 'wait':
+      return 'i-lucide-refresh-cw'
+    default:
+      return 'i-lucide-compass'
+  }
+}
+
+const runWorkspaceNextStep = async () => {
+  const action = workspaceGuidance.value?.nextStep.action
+
+  switch (action) {
+    case 'result':
+      openCreateResult()
+      return
+    case 'exception':
+      openCreateException()
+      return
+    case 'retry-analysis': {
+      const failedJob = failedAnalysisJobs.value[0]
+      if (failedJob) {
+        await retryAnalysisJob(failedJob)
+        return
+      }
+      openCreateAnalysisJob()
+      return
+    }
+    case 'wait':
+      await refreshAnalysisJobs()
+      return
+    default:
+      openCreateAnalysisJob()
   }
 }
 </script>
@@ -1382,6 +1450,92 @@ const analysisJobStatusLabel = (value: string) => {
         </div>
 
         <div class="space-y-4">
+          <UCard v-if="workspaceGuidance">
+            <template #header>
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UBadge :color="workspaceGuidance.summaryTone" variant="soft">
+                      工作台摘要
+                    </UBadge>
+                    <span class="text-xs uppercase tracking-[0.18em] text-muted">
+                      Sample Workspace
+                    </span>
+                  </div>
+                  <h2 class="mt-3 text-lg font-semibold text-highlighted">
+                    {{ workspaceGuidance.summaryTitle }}
+                  </h2>
+                  <p class="mt-1 text-sm text-toned">
+                    {{ workspaceGuidance.summaryDescription }}
+                  </p>
+                </div>
+
+                <UButton
+                  :icon="workspaceGuidanceActionIcon(workspaceGuidance.nextStep.action)"
+                  @click="runWorkspaceNextStep"
+                >
+                  {{ workspaceGuidanceActionLabel(workspaceGuidance.nextStep.action) }}
+                </UButton>
+              </div>
+            </template>
+
+            <div class="space-y-4">
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div
+                  v-for="stat in workspaceGuidance.stats"
+                  :key="stat.label"
+                  class="rounded-2xl border border-default bg-muted/20 px-4 py-3"
+                >
+                  <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                    {{ stat.label }}
+                  </p>
+                  <p class="mt-2 text-2xl font-semibold text-highlighted">
+                    {{ stat.value }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="rounded-2xl bg-primary/5 px-4 py-4 text-sm">
+                <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                  推荐下一步
+                </p>
+                <p class="mt-2 font-medium text-highlighted">
+                  {{ workspaceGuidance.nextStep.title }}
+                </p>
+                <p class="mt-1 text-toned">
+                  {{ workspaceGuidance.nextStep.description }}
+                </p>
+              </div>
+
+              <div v-if="workspaceGuidance.risks.length > 0" class="space-y-3">
+                <div
+                  v-for="risk in workspaceGuidance.risks"
+                  :key="risk.kind"
+                  class="rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm"
+                >
+                  <p class="font-medium text-highlighted">
+                    {{ risk.title }}
+                  </p>
+                  <p class="mt-1 text-toned">
+                    {{ risk.description }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap gap-2">
+                <UButton color="primary" variant="soft" icon="i-lucide-flask-conical" @click="openCreateResult()">
+                  新增结果
+                </UButton>
+                <UButton color="warning" variant="soft" icon="i-lucide-alert-triangle" @click="openCreateException()">
+                  记录异常
+                </UButton>
+                <UButton color="neutral" variant="outline" icon="i-lucide-sparkles" @click="openCreateAnalysisJob()">
+                  发起分析
+                </UButton>
+              </div>
+            </div>
+          </UCard>
+
           <UCard>
             <template #header>
               <div>
@@ -1401,6 +1555,15 @@ const analysisJobStatusLabel = (value: string) => {
                 </p>
                 <p class="mt-1">
                   结果录入成功后，`registered` / `received` 样本会自动推进到 `testing`。
+                </p>
+                <p v-if="openExceptions.length > 0" class="mt-1">
+                  当前仍有 <span class="font-semibold text-highlighted">{{ openExceptions.length }}</span> 条未解决异常，需要结合现场情况继续判断。
+                </p>
+                <p v-if="failedAnalysisJobs.length > 0" class="mt-1">
+                  当前有 <span class="font-semibold text-highlighted">{{ failedAnalysisJobs.length }}</span> 个失败分析任务，建议优先查看失败原因或重新发起分析。
+                </p>
+                <p v-if="activeAnalysisJobs.length > 0" class="mt-1">
+                  当前还有 <span class="font-semibold text-highlighted">{{ activeAnalysisJobs.length }}</span> 个待执行或执行中的分析任务。
                 </p>
               </div>
 

@@ -6,7 +6,7 @@ compatibility: 需要 openspec CLI。
 metadata:
   author: openspec
   version: "1.0"
-  generatedBy: "1.2.0"
+  generatedBy: "1.2.0-2"
 ---
 
 提案新变更 - 一步创建变更并生成所有产出物。

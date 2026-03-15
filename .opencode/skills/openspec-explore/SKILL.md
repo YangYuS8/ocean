@@ -6,7 +6,7 @@ compatibility: 需要 openspec CLI。
 metadata:
   author: openspec
   version: "1.0"
-  generatedBy: "1.2.0"
+  generatedBy: "1.2.0-2"
 ---
 
 进入探索模式。深入思考。自由想象。跟随对话的任何方向。

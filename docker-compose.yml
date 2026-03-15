@@ -61,14 +61,20 @@ services:
     build:
       context: ./python
       args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.ustc.edu.cn}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
         PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
     working_dir: /workspace
     volumes:
       - ./python:/workspace:Z
-      - ./python/.venv:/workspace/.venv:Z
+      - python-venv:/workspace/.venv
+      - ./backend/storage/app/public:/workspace/backend-storage:Z
       - python-uv-cache:/root/.cache/uv
     environment:
+      OCEAN_API_BASE: http://nginx
+      OCEAN_STORAGE_ROOT: /workspace/backend-storage
+      OCEAN_YOLO_MODEL_PATH: /workspace/models/uprc2018/best.pt
+      OCEAN_WORKER_POLL_SECONDS: 3
       REDIS_HOST: redis
       REDIS_PORT: 6379
       UV_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
@@ -126,6 +132,8 @@ volumes:
     name: ocean-frontend-pnpm-store
   python-uv-cache:
     name: ocean-python-uv-cache
+  python-venv:
+    name: ocean-python-venv
   mariadb-data:
     name: ocean-mariadb-data
   redis-data:

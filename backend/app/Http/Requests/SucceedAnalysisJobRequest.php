@@ -8,6 +8,7 @@ class SucceedAnalysisJobRequest extends ApiFormRequest
     {
         return [
             'result_summary' => ['nullable', 'string'],
+            'suggestion' => ['nullable', 'array'],
         ];
     }
 }

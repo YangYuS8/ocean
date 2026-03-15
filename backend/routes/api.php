@@ -18,6 +18,9 @@ Route::post('/inspection-tasks/{id}/submit', [InspectionTaskController::class, '
 Route::get('/samples', [SampleController::class, 'index']);
 Route::post('/samples', [SampleController::class, 'store']);
 Route::get('/samples/{id}', [SampleController::class, 'show']);
+Route::post('/samples/{id}/main-image', [SampleController::class, 'storeMainImage']);
+Route::get('/samples/{id}/main-image/content', [SampleController::class, 'showMainImageContent']);
+Route::get('/samples/{id}/image-suggestion', [SampleController::class, 'showImageSuggestion']);
 
 Route::get('/samples/{id}/results', [SampleResultController::class, 'index']);
 Route::post('/samples/{id}/results', [SampleResultController::class, 'store']);

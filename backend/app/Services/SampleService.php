@@ -4,7 +4,11 @@ namespace App\Services;
 
 use App\Exceptions\ApiException;
 use App\Services\Concerns\PaginatesQueries;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SampleService
 {
@@ -50,6 +54,7 @@ class SampleService
             'location_text' => $row->location_text,
             'collector_id' => $row->collector_id === null ? null : (int) $row->collector_id,
             'collector_name' => $row->collector_name,
+            'main_image' => $this->formatMainImage($row),
         ])->all();
 
         return compact('data', 'page', 'pageSize', 'total');
@@ -123,9 +128,182 @@ class SampleService
             ],
             'received_at' => $sample->received_at,
             'notes' => $sample->notes,
+            'main_image' => $this->formatMainImage($sample),
             'created_at' => $sample->created_at,
             'updated_at' => $sample->updated_at,
         ];
+    }
+
+    public function storeMainImage(int $id, UploadedFile $image): array
+    {
+        $sample = $this->findSample($id);
+        $oldPath = $sample->main_image_path;
+        $path = $image->store('sample-main-images', 'public');
+        $version = ((int) ($sample->main_image_version ?? 0)) + 1;
+        $uploadedAt = now();
+
+        DB::table('samples')->where('id', $id)->update([
+            'main_image_path' => $path,
+            'main_image_name' => $image->getClientOriginalName(),
+            'main_image_mime_type' => $image->getClientMimeType(),
+            'main_image_size' => $image->getSize(),
+            'main_image_version' => $version,
+            'main_image_uploaded_at' => $uploadedAt,
+            'updated_at' => $uploadedAt,
+        ]);
+
+        if ($oldPath && $oldPath !== $path && Storage::disk('public')->exists($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        $updated = $this->findSample($id);
+
+        return [
+            'sample_id' => $id,
+            'main_image' => $this->formatMainImage($updated),
+        ];
+    }
+
+    public function showMainImageContent(int $id): BinaryFileResponse
+    {
+        $sample = $this->findSample($id);
+
+        if (!$sample->main_image_path) {
+            throw new ApiException('NOT_FOUND', 'main image not found', 404);
+        }
+
+        if (!Storage::disk('public')->exists($sample->main_image_path)) {
+            throw new ApiException('NOT_FOUND', 'main image content not found', 404);
+        }
+
+        return response()->file(
+            Storage::disk('public')->path($sample->main_image_path),
+            ['Content-Type' => $sample->main_image_mime_type ?? 'application/octet-stream']
+        );
+    }
+
+    public function showImageSuggestion(int $id): array
+    {
+        $sample = $this->findSample($id);
+
+        if (!$sample->main_image_path) {
+            return [
+                'state' => 'missing_main_image',
+                'summary' => null,
+                'suggestion' => null,
+                'job' => null,
+            ];
+        }
+
+        $jobs = DB::table('analysis_jobs')
+            ->where('sample_id', $id)
+            ->where('job_type', 'object_detection')
+            ->orderByDesc('id')
+            ->get();
+
+        $currentVersion = (int) ($sample->main_image_version ?? 0);
+        $currentVersionJobs = $jobs->filter(function ($job) use ($currentVersion) {
+            return (int) Arr::get($this->decodeJson($job->params_json), 'main_image_version', 0) === $currentVersion;
+        });
+
+        $activeCurrentJob = $currentVersionJobs->first(fn ($job) => in_array($job->status, ['queued', 'running'], true));
+        $latestSucceededCurrentJob = $currentVersionJobs->first(fn ($job) => $job->status === 'succeeded');
+
+        if ($activeCurrentJob && $latestSucceededCurrentJob) {
+            return [
+                'state' => 'refreshing',
+                'summary' => $latestSucceededCurrentJob->result_summary,
+                'suggestion' => $this->decodeJson($latestSucceededCurrentJob->suggestion_json),
+                'job' => [
+                    'id' => (int) $activeCurrentJob->id,
+                    'status' => $activeCurrentJob->status,
+                    'finished_at' => $activeCurrentJob->finished_at,
+                    'started_at' => $activeCurrentJob->started_at,
+                    'queued_at' => $activeCurrentJob->queued_at,
+                    'current_main_image_version' => $currentVersion,
+                    'job_main_image_version' => $currentVersion,
+                ],
+            ];
+        }
+
+        $currentJob = $currentVersionJobs->first();
+
+        if ($currentJob) {
+            return $this->formatSuggestionState($currentJob, $sample, true);
+        }
+
+        $latestHistorical = $jobs->first();
+        if ($latestHistorical) {
+            return $this->formatSuggestionState($latestHistorical, $sample, false);
+        }
+
+        return [
+            'state' => 'idle',
+            'summary' => null,
+            'suggestion' => null,
+            'job' => null,
+        ];
+    }
+
+    private function findSample(int $id): object
+    {
+        $sample = DB::table('samples')->where('id', $id)->first();
+
+        if (!$sample) {
+            throw new ApiException('NOT_FOUND', 'sample not found', 404);
+        }
+
+        return $sample;
+    }
+
+    private function formatMainImage(object $sample): ?array
+    {
+        if (!$sample->main_image_path) {
+            return null;
+        }
+
+        return [
+            'file_name' => $sample->main_image_name,
+            'mime_type' => $sample->main_image_mime_type,
+            'size' => $sample->main_image_size === null ? null : (int) $sample->main_image_size,
+            'version' => (int) ($sample->main_image_version ?? 0),
+            'uploaded_at' => $sample->main_image_uploaded_at,
+            'content_url' => sprintf('/api/samples/%d/main-image/content', (int) $sample->id),
+        ];
+    }
+
+    private function formatSuggestionState(object $job, object $sample, bool $isCurrent): array
+    {
+        $state = match ($job->status) {
+            'queued', 'running' => 'running',
+            'failed' => $isCurrent ? 'failed' : 'stale',
+            'succeeded' => $isCurrent ? 'current' : 'stale',
+            default => $isCurrent ? 'idle' : 'stale',
+        };
+
+        return [
+            'state' => $state,
+            'summary' => $job->result_summary,
+            'suggestion' => $this->decodeJson($job->suggestion_json),
+            'job' => [
+                'id' => (int) $job->id,
+                'status' => $job->status,
+                'finished_at' => $job->finished_at,
+                'started_at' => $job->started_at,
+                'queued_at' => $job->queued_at,
+                'current_main_image_version' => (int) ($sample->main_image_version ?? 0),
+                'job_main_image_version' => (int) Arr::get($this->decodeJson($job->params_json), 'main_image_version', 0),
+            ],
+        ];
+    }
+
+    private function decodeJson(?string $json): mixed
+    {
+        if ($json === null || $json === '') {
+            return null;
+        }
+
+        return json_decode($json, true);
     }
 
     private function assertUserExists(int $userId): void

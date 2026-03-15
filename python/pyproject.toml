@@ -9,6 +9,7 @@ dependencies = [
     "scipy==1.16.0",
     "scikit-learn==1.7.0",
     "matplotlib==3.10.3",
+    "ultralytics==8.4.22",
 ]
 
 [tool.uv]

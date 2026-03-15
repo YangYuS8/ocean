@@ -1,5 +1,17 @@
 <script setup lang="ts">
 import { buildSampleWorkspaceGuidance } from '../../utils/sampleWorkspaceGuidance.js'
+import { buildSampleImageSuggestionView } from '../../utils/sampleImageSuggestionView.js'
+
+type SampleMainImage = {
+  file_name: string
+  mime_type: string | null
+  size: number | null
+  version: number
+  uploaded_at: string | null
+  content_url: string
+}
+
+type UiTone = 'error' | 'primary' | 'secondary' | 'success' | 'info' | 'warning' | 'neutral'
 
 type SampleDetail = {
   id: number
@@ -20,6 +32,7 @@ type SampleDetail = {
   }
   received_at: string | null
   notes: string | null
+  main_image: SampleMainImage | null
   created_at: string | null
   updated_at: string | null
 }
@@ -104,6 +117,13 @@ type AnalysisJob = {
   job_type: string
   status: string
   result_summary: string | null
+  suggestion?: {
+    has_findings?: boolean
+    counts?: Record<string, number>
+    confidence_summary?: {
+      top_score?: number
+    }
+  } | null
   error_message: string | null
   queued_by: null | {
     id: number
@@ -135,6 +155,36 @@ type AnalysisJobActionResponse = {
     finished_at?: string
     result_summary?: string | null
     error_message?: string | null
+  }
+}
+
+type SampleMainImageUploadResponse = {
+  data: {
+    sample_id: number
+    main_image: SampleMainImage
+  }
+}
+
+type ImageSuggestionResponse = {
+  data: {
+    state: string
+    summary: string | null
+    suggestion: null | {
+      has_findings?: boolean
+      counts?: Record<string, number>
+      confidence_summary?: {
+        top_score?: number
+      }
+    }
+    job: null | {
+      id: number
+      status: string
+      finished_at: string | null
+      started_at: string | null
+      queued_at: string | null
+      current_main_image_version: number
+      job_main_image_version: number
+    }
   }
 }
 
@@ -172,13 +222,24 @@ const { data: analysisJobsData, pending: analysisJobsPending, error: analysisJob
   query: analysisJobQuery
 })
 
+const { data: imageSuggestionData, pending: imageSuggestionPending, error: imageSuggestionError, refresh: refreshImageSuggestion } = await useFetch<ImageSuggestionResponse>(() => `/api/samples/${sampleId.value}/image-suggestion`, {
+  baseURL,
+  watch: [sampleId]
+})
+
 const sample = computed(() => data.value?.data ?? null)
 const results = computed(() => resultsData.value?.data ?? [])
 const exceptions = computed(() => exceptionsData.value?.data ?? [])
 const analysisJobs = computed(() => analysisJobsData.value?.data ?? [])
+const imageSuggestion = computed(() => imageSuggestionData.value?.data ?? null)
 const openExceptions = computed(() => exceptions.value.filter(item => item.status === 'open'))
 const failedAnalysisJobs = computed(() => analysisJobs.value.filter(item => item.status === 'failed'))
 const activeAnalysisJobs = computed(() => analysisJobs.value.filter(item => item.status === 'queued' || item.status === 'running'))
+const imageSuggestionView = computed(() => buildSampleImageSuggestionView({
+  sample: sample.value,
+  suggestion: imageSuggestion.value
+}))
+const imageSuggestionTone = computed(() => imageSuggestionView.value.tone as UiTone)
 const workspaceGuidance = computed(() => sample.value ? buildSampleWorkspaceGuidance({
   sample: sample.value,
   results: results.value,
@@ -269,7 +330,8 @@ const exceptionForm = reactive({
 
 const analysisJobTypeOptions = [
   { value: 'quality_assessment', label: '质量评估' },
-  { value: 'anomaly_scan', label: '异常扫描' }
+  { value: 'anomaly_scan', label: '异常扫描' },
+  { value: 'object_detection', label: '自动检测' }
 ] as const
 
 const showCreateAnalysisJob = ref(false)
@@ -277,6 +339,10 @@ const analysisJobCreatePending = ref(false)
 const analysisJobError = ref('')
 const analysisJobSuccess = ref('')
 const analysisJobActionPendingId = ref<number | null>(null)
+const mainImageUploadPending = ref(false)
+const mainImageUploadError = ref('')
+const mainImageUploadSuccess = ref('')
+const mainImageInput = ref<HTMLInputElement | null>(null)
 
 const analysisJobForm = reactive({
   job_type: 'quality_assessment',
@@ -495,7 +561,81 @@ const createAnalysisJob = async () => {
   }
 }
 
+const refreshImageWorkspace = async () => {
+  await Promise.all([refreshSample(), refreshAnalysisJobs(), refreshImageSuggestion()])
+}
+
+const triggerMainImageUpload = () => {
+  mainImageInput.value?.click()
+}
+
+const uploadMainImage = async (event: Event) => {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+
+  if (!file) {
+    return
+  }
+
+  mainImageUploadPending.value = true
+  mainImageUploadError.value = ''
+  mainImageUploadSuccess.value = ''
+
+  try {
+    const formData = new FormData()
+    formData.append('image', file)
+
+    await request<SampleMainImageUploadResponse>(`/api/samples/${sampleId.value}/main-image`, {
+      method: 'POST',
+      body: formData
+    })
+
+    await refreshImageWorkspace()
+    mainImageUploadSuccess.value = '主图已更新，若需要新的建议，请重新运行自动检测。'
+  }
+  catch (error) {
+    mainImageUploadError.value = getErrorMessage(error, '主图上传失败，请稍后重试。')
+  }
+  finally {
+    if (input) {
+      input.value = ''
+    }
+
+    mainImageUploadPending.value = false
+  }
+}
+
+const createObjectDetectionJob = async () => {
+  analysisJobCreatePending.value = true
+  analysisJobError.value = ''
+  analysisJobSuccess.value = ''
+
+  try {
+    await request<AnalysisJobCreateResponse>('/api/analysis-jobs', {
+      method: 'POST',
+      body: {
+        sample_id: Number(sampleId.value),
+        job_type: 'object_detection',
+        ...(sample.value?.collector?.id ? { queued_by: sample.value.collector.id } : {})
+      }
+    })
+
+    await Promise.all([refreshAnalysisJobs(), refreshImageSuggestion()])
+    analysisJobSuccess.value = '自动检测已发起，稍后可在建议卡片和分析任务列表中查看状态。'
+  }
+  catch (error) {
+    analysisJobError.value = getErrorMessage(error, '自动检测发起失败，请稍后重试。')
+  }
+  finally {
+    analysisJobCreatePending.value = false
+  }
+}
+
 const getAnalysisJobSuccessSummary = (job: AnalysisJob) => {
+  if (job.job_type === 'object_detection') {
+    return '自动检测已完成，可查看当前主图的建议摘要。'
+  }
+
   if (job.job_type === 'quality_assessment') {
     return '质量评估已完成，可结合结果摘要继续录入样本结果或补充异常记录。'
   }
@@ -504,6 +644,10 @@ const getAnalysisJobSuccessSummary = (job: AnalysisJob) => {
 }
 
 const getAnalysisJobFailureMessage = (job: AnalysisJob) => {
+  if (job.job_type === 'object_detection') {
+    return '自动检测未完成，请稍后重新发起。'
+  }
+
   if (job.job_type === 'quality_assessment') {
     return '质量评估未完成，请稍后重新发起，或根据现场情况补充异常记录。'
   }
@@ -522,7 +666,7 @@ const runAnalysisJobAction = async (jobId: number, path: string, successMessage:
       ...(body ? { body } : {})
     })
 
-    await refreshAnalysisJobs()
+    await Promise.all([refreshAnalysisJobs(), refreshImageSuggestion()])
     analysisJobSuccess.value = successMessage
   }
   catch (error) {
@@ -638,6 +782,49 @@ const analysisJobStatusLabel = (value: string) => {
       return '已取消'
     default:
       return value
+  }
+}
+
+const imageSuggestionActionLabel = (action: string) => {
+  switch (action) {
+    case 'upload':
+      return '上传主图'
+    case 'run':
+      return '运行自动检测'
+    case 'rerun':
+      return '重新检测'
+    case 'busy':
+      return '检测中...'
+    default:
+      return '查看建议'
+  }
+}
+
+const imageSuggestionActionIcon = (action: string) => {
+  switch (action) {
+    case 'upload':
+      return 'i-lucide-upload'
+    case 'run':
+      return 'i-lucide-sparkles'
+    case 'rerun':
+      return 'i-lucide-rotate-ccw'
+    case 'busy':
+      return 'i-lucide-loader-circle'
+    default:
+      return 'i-lucide-sparkles'
+  }
+}
+
+const runImageSuggestionPrimaryAction = async () => {
+  const action = imageSuggestionView.value.primaryAction
+
+  if (action === 'upload') {
+    triggerMainImageUpload()
+    return
+  }
+
+  if (action === 'run' || action === 'rerun') {
+    await createObjectDetectionJob()
   }
 }
 
@@ -1450,6 +1637,162 @@ const runWorkspaceNextStep = async () => {
         </div>
 
         <div class="space-y-4">
+          <UCard>
+            <template #header>
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold text-highlighted">
+                    当前主图
+                  </h2>
+                  <p class="mt-1 text-sm text-toned">
+                    MVP 阶段每个样本只有一张主图，自动检测默认基于当前主图运行。
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                  <input
+                    ref="mainImageInput"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    class="hidden"
+                    @change="uploadMainImage"
+                  >
+                  <UButton icon="i-lucide-upload" :loading="mainImageUploadPending" @click="triggerMainImageUpload">
+                    {{ sample.main_image ? '替换主图' : '上传主图' }}
+                  </UButton>
+                </div>
+              </div>
+            </template>
+
+            <div class="space-y-4">
+              <UAlert
+                v-if="mainImageUploadError"
+                color="error"
+                variant="soft"
+                title="主图上传失败"
+                :description="mainImageUploadError"
+              />
+
+              <UAlert
+                v-if="mainImageUploadSuccess"
+                color="success"
+                variant="soft"
+                title="主图已更新"
+                :description="mainImageUploadSuccess"
+              />
+
+              <div v-if="sample.main_image" class="space-y-4">
+                <img
+                  :src="sample.main_image.content_url"
+                  :alt="`${sample.sample_code} 主图`"
+                  class="max-h-72 w-full rounded-2xl border border-default object-cover"
+                >
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <div class="rounded-2xl border border-default bg-muted/20 px-4 py-3 text-sm">
+                    <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                      文件名
+                    </p>
+                    <p class="mt-2 font-medium text-highlighted">
+                      {{ sample.main_image.file_name }}
+                    </p>
+                  </div>
+                  <div class="rounded-2xl border border-default bg-muted/20 px-4 py-3 text-sm">
+                    <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                      主图版本
+                    </p>
+                    <p class="mt-2 font-medium text-highlighted">
+                      v{{ sample.main_image.version }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="rounded-2xl border border-dashed border-default bg-muted/10 px-4 py-8 text-center text-sm text-toned">
+                当前样本还没有主图，上传后才能运行自动检测。
+              </div>
+            </div>
+          </UCard>
+
+          <UCard>
+            <template #header>
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold text-highlighted">
+                    自动检测建议
+                  </h2>
+                  <p class="mt-1 text-sm text-toned">
+                    基于当前主图生成，仅供人工参考，不会自动写入正式结果。
+                  </p>
+                </div>
+
+                <UButton
+                  :icon="imageSuggestionActionIcon(imageSuggestionView.primaryAction)"
+                  :loading="analysisJobCreatePending && (imageSuggestionView.primaryAction === 'run' || imageSuggestionView.primaryAction === 'rerun')"
+                  :disabled="imageSuggestionView.primaryAction === 'busy' || mainImageUploadPending"
+                  @click="runImageSuggestionPrimaryAction"
+                >
+                  {{ imageSuggestionActionLabel(imageSuggestionView.primaryAction) }}
+                </UButton>
+              </div>
+            </template>
+
+            <div class="space-y-4">
+              <UAlert
+                v-if="imageSuggestionError"
+                color="error"
+                variant="soft"
+                title="自动检测建议加载失败"
+                :description="'请稍后刷新页面重试。'"
+              />
+
+              <div v-else-if="imageSuggestionPending" class="space-y-3">
+                <div class="h-20 rounded-2xl bg-muted/40" />
+                <div class="h-20 rounded-2xl bg-muted/40" />
+              </div>
+
+              <div v-else class="space-y-4">
+                <div class="rounded-2xl border border-default bg-muted/20 px-4 py-4">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UBadge :color="imageSuggestionTone" variant="soft">
+                      {{ imageSuggestionView.title }}
+                    </UBadge>
+                    <span v-if="imageSuggestion?.job?.id" class="text-xs text-muted">
+                      Job #{{ imageSuggestion.job.id }}
+                    </span>
+                  </div>
+
+                  <p class="mt-3 text-sm text-toned">
+                    {{ imageSuggestionView.description }}
+                  </p>
+
+                  <p class="mt-3 text-base font-medium text-highlighted">
+                    {{ imageSuggestionView.summary }}
+                  </p>
+
+                  <p v-if="imageSuggestionView.meta" class="mt-2 text-xs text-muted">
+                    {{ imageSuggestionView.meta }}
+                  </p>
+                </div>
+
+                <div v-if="imageSuggestion?.suggestion?.counts && Object.keys(imageSuggestion.suggestion.counts).length > 0" class="grid gap-3 sm:grid-cols-2">
+                  <div
+                    v-for="(count, label) in imageSuggestion.suggestion.counts"
+                    :key="label"
+                    class="rounded-2xl border border-default bg-default px-4 py-3"
+                  >
+                    <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                      {{ label }}
+                    </p>
+                    <p class="mt-2 text-2xl font-semibold text-highlighted">
+                      {{ count }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </UCard>
+
           <UCard v-if="workspaceGuidance">
             <template #header>
               <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">

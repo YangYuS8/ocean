@@ -185,6 +185,9 @@ Python 分析目录位于 `python/`，当前通过 `uv` 管理虚拟环境与依
 - 本地虚拟环境路径：`python/.venv`
 - 容器内虚拟环境路径：`/workspace/.venv`
 - 依赖来源：`python/pyproject.toml` 与 `python/uv.lock`
+- 当前 YOLO 模型默认放在 `python/models/uprc2018/best.pt`
+- 如果要替换模型，直接用新的 `.pt` 文件覆盖 `python/models/uprc2018/best.pt`，然后执行 `docker compose up -d --build python`
+- 当前仓库只内置推理所需权重文件，不额外保留训练参数副本
 - `uv` 默认索引已切换到清华源
 - `python/.venv` 直接挂载进容器，可复用本地虚拟环境，避免每次启动都重新从空环境装依赖
 - `uv` 缓存通过独立 volume 持久化，加快重复构建与重启

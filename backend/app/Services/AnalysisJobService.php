@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\ApiException;
 use App\Services\Concerns\PaginatesQueries;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class AnalysisJobService
@@ -45,6 +46,7 @@ class AnalysisJobService
             'job_type' => $row->job_type,
             'status' => $row->status,
             'result_summary' => $row->result_summary,
+            'suggestion' => $this->decodeJson($row->suggestion_json),
             'error_message' => $row->error_message,
             'queued_by' => $row->queued_by === null ? null : [
                 'id' => (int) $row->queued_by,
@@ -71,11 +73,16 @@ class AnalysisJobService
             throw new ApiException('NOT_FOUND', 'user not found', 404);
         }
 
+        $params = array_key_exists('params', $payload) ? $payload['params'] : null;
+        if ($payload['job_type'] === 'object_detection') {
+            $params = $this->buildObjectDetectionParams((int) $payload['sample_id'], $params ?? []);
+        }
+
         $id = DB::table('analysis_jobs')->insertGetId([
             'sample_id' => (int) $payload['sample_id'],
             'job_type' => $payload['job_type'],
             'status' => 'queued',
-            'params_json' => array_key_exists('params', $payload) ? json_encode($payload['params'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+            'params_json' => $params === null ? null : json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'queued_by' => $payload['queued_by'] ?? null,
             'queued_at' => now(),
             'created_at' => now(),
@@ -102,6 +109,7 @@ class AnalysisJobService
             'status' => $job->status,
             'params' => $this->decodeJson($job->params_json),
             'result_summary' => $job->result_summary,
+            'suggestion' => $this->decodeJson($job->suggestion_json),
             'error_message' => $job->error_message,
             'queued_by' => $job->queued_by === null ? null : [
                 'id' => (int) $job->queued_by,
@@ -143,6 +151,7 @@ class AnalysisJobService
         DB::table('analysis_jobs')->where('id', $id)->update([
             'status' => 'succeeded',
             'result_summary' => $payload['result_summary'] ?? null,
+            'suggestion_json' => array_key_exists('suggestion', $payload) ? json_encode($payload['suggestion'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
             'error_message' => null,
             'finished_at' => $finishedAt,
             'updated_at' => $finishedAt,
@@ -152,6 +161,7 @@ class AnalysisJobService
             'id' => $id,
             'status' => 'succeeded',
             'result_summary' => DB::table('analysis_jobs')->where('id', $id)->value('result_summary'),
+            'suggestion' => $this->decodeJson(DB::table('analysis_jobs')->where('id', $id)->value('suggestion_json')),
             'finished_at' => DB::table('analysis_jobs')->where('id', $id)->value('finished_at'),
         ];
     }
@@ -166,6 +176,7 @@ class AnalysisJobService
         DB::table('analysis_jobs')->where('id', $id)->update([
             'status' => 'failed',
             'error_message' => $payload['error_message'] ?? null,
+            'suggestion_json' => null,
             'finished_at' => $finishedAt,
             'updated_at' => $finishedAt,
         ]);
@@ -257,6 +268,45 @@ class AnalysisJobService
         if (!in_array($job->status, $allowedStates, true)) {
             throw new ApiException('INVALID_STATE', $message, 409);
         }
+    }
+
+    private function buildObjectDetectionParams(int $sampleId, array $params): array
+    {
+        $sample = DB::table('samples')->select([
+            'id',
+            'status',
+            'main_image_path',
+            'main_image_name',
+            'main_image_version',
+        ])->where('id', $sampleId)->first();
+
+        if (!$sample) {
+            throw new ApiException('NOT_FOUND', 'sample not found', 404);
+        }
+
+        if (!$sample->main_image_path) {
+            throw new ApiException('INVALID_STATE', 'sample main image is required for object detection', 409);
+        }
+
+        $mainImageVersion = (int) ($sample->main_image_version ?? 0);
+        $duplicateActiveJob = DB::table('analysis_jobs')->where('sample_id', $sampleId)
+            ->where('job_type', 'object_detection')
+            ->whereIn('status', ['queued', 'running'])
+            ->orderByDesc('id')
+            ->get()
+            ->first(function ($job) use ($mainImageVersion) {
+                return (int) Arr::get($this->decodeJson($job->params_json), 'main_image_version', 0) === $mainImageVersion;
+            });
+
+        if ($duplicateActiveJob) {
+            throw new ApiException('INVALID_STATE', 'object detection is already in progress for current main image', 409);
+        }
+
+        return array_merge($params, [
+            'main_image_path' => $sample->main_image_path,
+            'main_image_name' => $sample->main_image_name,
+            'main_image_version' => $mainImageVersion,
+        ]);
     }
 
     private function decodeJson(mixed $value): mixed

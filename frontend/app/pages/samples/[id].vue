@@ -1001,14 +1001,14 @@ const runWorkspaceNextStep = async () => {
                   </p>
                 </div>
 
-                <UButton type="button" color="neutral" variant="ghost" icon="i-lucide-x" @click="showCreateResult = false" />
+                <UButton type="button" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="关闭结果录入表单" @click="showCreateResult = false" />
               </div>
 
               <form class="space-y-4" @submit.prevent="createResult">
                 <div class="grid gap-4 md:grid-cols-2">
                   <label class="block space-y-2 text-sm text-toned">
                     <span class="font-medium text-highlighted">结果类型</span>
-                    <select v-model="resultForm.result_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                    <select v-model="resultForm.result_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                       <option v-for="option in resultTypeOptions" :key="option.value" :value="option.value">
                         {{ option.label }}
                       </option>
@@ -1017,13 +1017,13 @@ const runWorkspaceNextStep = async () => {
 
                   <label class="block space-y-2 text-sm text-toned">
                     <span class="font-medium text-highlighted">录入人 ID</span>
-                    <input v-model.trim="resultForm.entered_by" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                    <input v-model.trim="resultForm.entered_by" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                   </label>
                 </div>
 
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">结论</span>
-                  <input v-model.trim="resultForm.conclusion" type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  <input v-model.trim="resultForm.conclusion" type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                 </label>
 
                 <div class="grid gap-4 xl:grid-cols-2">
@@ -1034,7 +1034,7 @@ const runWorkspaceNextStep = async () => {
                         恢复模板
                       </UButton>
                     </span>
-                    <textarea v-model="resultForm.raw_value" rows="9" class="w-full rounded-2xl border border-default bg-default px-3 py-2 font-mono text-xs text-default outline-none transition focus:border-primary"></textarea>
+                    <textarea v-model="resultForm.raw_value" rows="9" class="w-full rounded-2xl border border-default bg-default px-3 py-2 font-mono text-xs text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary"></textarea>
                     <p class="text-xs text-muted">
                       {{ resultForm.result_type === 'salinity_test' ? '推荐字段：salinity, unit' : '推荐字段：ph, unit' }}
                     </p>
@@ -1050,7 +1050,7 @@ const runWorkspaceNextStep = async () => {
                         恢复模板
                       </UButton>
                     </span>
-                    <textarea v-model="resultForm.normalized_value" rows="9" class="w-full rounded-2xl border border-default bg-default px-3 py-2 font-mono text-xs text-default outline-none transition focus:border-primary"></textarea>
+                    <textarea v-model="resultForm.normalized_value" rows="9" class="w-full rounded-2xl border border-default bg-default px-3 py-2 font-mono text-xs text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary"></textarea>
                     <p class="text-xs text-muted">
                       可留空；若填写，建议补充 `range_flag` 字段。
                     </p>
@@ -1062,7 +1062,7 @@ const runWorkspaceNextStep = async () => {
 
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">备注（可选）</span>
-                  <textarea v-model.trim="resultForm.notes" rows="3" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary"></textarea>
+                  <textarea v-model.trim="resultForm.notes" rows="3" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary"></textarea>
                 </label>
 
                 <UAlert
@@ -1208,14 +1208,14 @@ const runWorkspaceNextStep = async () => {
                   </p>
                 </div>
 
-                <UButton type="button" color="neutral" variant="ghost" icon="i-lucide-x" @click="showCreateException = false" />
+                <UButton type="button" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="关闭异常登记表单" @click="showCreateException = false" />
               </div>
 
               <form class="space-y-4" @submit.prevent="createException">
                 <div class="grid gap-4 md:grid-cols-2">
                   <label class="block space-y-2 text-sm text-toned">
                     <span class="font-medium text-highlighted">异常分类</span>
-                    <select v-model="exceptionForm.category" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                    <select v-model="exceptionForm.category" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                       <option v-for="option in exceptionCategoryOptions" :key="option.value" :value="option.value">
                         {{ option.label }}
                       </option>
@@ -1224,7 +1224,7 @@ const runWorkspaceNextStep = async () => {
 
                   <label class="block space-y-2 text-sm text-toned">
                     <span class="font-medium text-highlighted">严重级别</span>
-                    <select v-model="exceptionForm.severity" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                    <select v-model="exceptionForm.severity" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                       <option v-for="option in exceptionSeverityOptions" :key="option.value" :value="option.value">
                         {{ option.label }}
                       </option>
@@ -1234,17 +1234,17 @@ const runWorkspaceNextStep = async () => {
 
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">异常标题</span>
-                  <input v-model.trim="exceptionForm.title" required type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  <input v-model.trim="exceptionForm.title" required type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                 </label>
 
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">异常描述（可选）</span>
-                  <textarea v-model.trim="exceptionForm.description" rows="4" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary"></textarea>
+                  <textarea v-model.trim="exceptionForm.description" rows="4" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary"></textarea>
                 </label>
 
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">上报人 ID</span>
-                  <input v-model.trim="exceptionForm.reported_by" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  <input v-model.trim="exceptionForm.reported_by" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                 </label>
 
                 <UAlert
@@ -1408,14 +1408,14 @@ const runWorkspaceNextStep = async () => {
                   </p>
                 </div>
 
-                <UButton type="button" color="neutral" variant="ghost" icon="i-lucide-x" @click="showCreateAnalysisJob = false" />
+                <UButton type="button" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="关闭分析任务表单" @click="showCreateAnalysisJob = false" />
               </div>
 
               <form class="space-y-4" @submit.prevent="createAnalysisJob">
                 <div class="grid gap-4 md:grid-cols-2">
                   <label class="block space-y-2 text-sm text-toned">
                     <span class="font-medium text-highlighted">分析类型</span>
-                    <select v-model="analysisJobForm.job_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                    <select v-model="analysisJobForm.job_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                       <option v-for="option in analysisJobTypeOptions" :key="option.value" :value="option.value">
                         {{ option.label }}
                       </option>
@@ -1424,7 +1424,7 @@ const runWorkspaceNextStep = async () => {
 
                   <label class="block space-y-2 text-sm text-toned">
                     <span class="font-medium text-highlighted">发起人 ID</span>
-                    <input v-model.trim="analysisJobForm.queued_by" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                    <input v-model.trim="analysisJobForm.queued_by" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                   </label>
                 </div>
 

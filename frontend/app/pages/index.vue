@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { buildOverviewMetrics } from '../utils/overviewMetrics.js'
+
 const { commandGroups } = useWorkspace()
 const config = useRuntimeConfig()
 const apiBase = import.meta.server ? (config.public.apiBase || undefined) : undefined
@@ -14,46 +16,10 @@ type SummaryResponse = {
 
 const { data: summaryData } = await useFetch<SummaryResponse>('/api/dashboard/summary', {
   baseURL: apiBase,
-  default: () => ({
-    data: {
-      pending_samples: 128,
-      today_inspection_tasks: 14,
-      open_exceptions: 3,
-      queued_analysis_jobs: 9
-    }
-  })
+  server: false
 })
 
-const metrics = computed(() => {
-  const summary = summaryData.value?.data
-
-  return [
-  {
-    title: '待处理样本',
-    value: String(summary?.pending_samples ?? 128),
-    description: '等待入库、检测或复核的样本总量',
-    icon: 'i-lucide-flask-conical'
-  },
-  {
-    title: '今日巡检任务',
-    value: String(summary?.today_inspection_tasks ?? 14),
-    description: '包含船载设备、实验设备与环境监测点位',
-    icon: 'i-lucide-clipboard-check'
-  },
-  {
-    title: '异常告警',
-    value: String(summary?.open_exceptions ?? 3),
-    description: '存在需人工确认的高优先级异常项',
-    icon: 'i-lucide-bell-ring'
-  },
-  {
-    title: '分析队列',
-    value: String(summary?.queued_analysis_jobs ?? 9),
-    description: '等待 Python 模块处理的图像与统计任务',
-    icon: 'i-lucide-cpu'
-  }
-]
-})
+const metrics = computed(() => buildOverviewMetrics(summaryData.value?.data ?? null))
 
 const quickLinks = commandGroups.value[0]?.items ?? []
 
@@ -103,13 +69,35 @@ const activityFeed = [
         </div>
       </section>
 
-      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <DashboardMetricCard
-          v-for="metric in metrics"
-          :key="metric.title"
-          v-bind="metric"
-        />
-      </section>
+      <ClientOnly>
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <DashboardMetricCard
+            v-for="metric in metrics"
+            :key="metric.title"
+            v-bind="metric"
+          />
+        </section>
+
+        <template #fallback>
+          <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div
+              v-for="metric in metrics"
+              :key="`${metric.title}-fallback`"
+              class="rounded-lg border border-default bg-default p-5"
+            >
+              <p class="text-sm text-toned">
+                {{ metric.title }}
+              </p>
+              <p class="mt-3 text-3xl font-semibold text-highlighted">
+                --
+              </p>
+              <p class="mt-2 text-sm text-toned">
+                {{ metric.description }}
+              </p>
+            </div>
+          </section>
+        </template>
+      </ClientOnly>
 
       <section class="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <UCard>

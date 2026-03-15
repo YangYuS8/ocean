@@ -157,7 +157,7 @@ const createSample = async () => {
             <div class="space-y-4">
               <label class="block space-y-2 text-sm text-toned">
                 <span class="font-medium text-highlighted">样本状态</span>
-                <select v-model="filters.status" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                <select v-model="filters.status" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                   <option v-for="value in sampleStatuses" :key="value" :value="value">
                     {{ value || '全部状态' }}
                   </option>
@@ -166,7 +166,7 @@ const createSample = async () => {
 
               <label class="block space-y-2 text-sm text-toned">
                 <span class="font-medium text-highlighted">样本类型</span>
-                <select v-model="filters.sample_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                <select v-model="filters.sample_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                   <option v-for="value in sampleTypes" :key="value" :value="value">
                     {{ value || '全部类型' }}
                   </option>
@@ -179,7 +179,7 @@ const createSample = async () => {
                   v-model.trim="filters.sample_code"
                   type="text"
                   placeholder="如 SP-20260311-001"
-                  class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary"
+                  class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary"
                 >
               </label>
 
@@ -215,12 +215,12 @@ const createSample = async () => {
               <form class="grid gap-4 md:grid-cols-2" @submit.prevent="createSample">
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">样本编号 *</span>
-                  <input v-model.trim="form.sample_code" required type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  <input v-model.trim="form.sample_code" required type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                 </label>
 
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">样本类型 *</span>
-                  <select v-model="form.sample_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  <select v-model="form.sample_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                     <option value="water">water</option>
                     <option value="sediment">sediment</option>
                     <option value="organism">organism</option>
@@ -230,32 +230,32 @@ const createSample = async () => {
 
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">样本名称</span>
-                  <input v-model.trim="form.name" type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  <input v-model.trim="form.name" type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                 </label>
 
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">来源任务 ID</span>
-                  <input v-model.trim="form.inspection_task_id" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  <input v-model.trim="form.inspection_task_id" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                 </label>
 
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">采集人 ID</span>
-                  <input v-model.trim="form.collector_id" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  <input v-model.trim="form.collector_id" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                 </label>
 
                 <label class="block space-y-2 text-sm text-toned">
                   <span class="font-medium text-highlighted">采集时间</span>
-                  <input v-model="form.collection_time" type="datetime-local" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  <input v-model="form.collection_time" type="datetime-local" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                 </label>
 
                 <label class="block space-y-2 text-sm text-toned md:col-span-2">
                   <span class="font-medium text-highlighted">采集位置</span>
-                  <input v-model.trim="form.location_text" type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary">
+                  <input v-model.trim="form.location_text" type="text" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
                 </label>
 
                 <label class="block space-y-2 text-sm text-toned md:col-span-2">
                   <span class="font-medium text-highlighted">备注</span>
-                  <textarea v-model.trim="form.notes" rows="3" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default outline-none transition focus:border-primary"></textarea>
+                  <textarea v-model.trim="form.notes" rows="3" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary"></textarea>
                 </label>
 
                 <UAlert

@@ -2,7 +2,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ocean_python.yolo_worker import build_suggestion_payload, process_job
+from ocean_python.yolo_worker import (
+    build_suggestion_payload,
+    process_job,
+    run_worker_iteration,
+)
 
 
 class FakeApiClient:
@@ -37,6 +41,19 @@ class FakeDetector:
         if self.error:
             raise self.error
         return self.detections
+
+
+class FlakyQueueApiClient:
+    def __init__(self, errors=None, jobs=None):
+        self.errors = list(errors or [])
+        self.jobs = list(jobs or [])
+        self.list_calls = 0
+
+    def list_queued_jobs(self):
+        self.list_calls += 1
+        if self.errors:
+            raise self.errors.pop(0)
+        return self.jobs
 
 
 class YoloWorkerTests(unittest.TestCase):
@@ -115,6 +132,20 @@ class YoloWorkerTests(unittest.TestCase):
             self.assertEqual([102], api_client.started)
             self.assertEqual([], api_client.succeeded)
             self.assertEqual([(102, "model unavailable")], api_client.failed)
+
+    def test_worker_iteration_survives_transient_queue_fetch_error(self):
+        api_client = FlakyQueueApiClient(errors=[RuntimeError("nginx unavailable")])
+        detector = FakeDetector()
+
+        processed = run_worker_iteration(
+            api_client=api_client,
+            detector=detector,
+            storage_root=Path("."),
+        )
+
+        self.assertEqual(0, processed)
+        self.assertEqual(1, api_client.list_calls)
+        self.assertEqual([], detector.calls)
 
 
 if __name__ == "__main__":

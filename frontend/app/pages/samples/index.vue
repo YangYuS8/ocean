@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { buildSampleListItemPreview } from '../../utils/sampleWorkspaceOverview.js'
+
 type Sample = {
   id: number
   sample_code: string
@@ -11,6 +13,22 @@ type Sample = {
   collector_id: number | null
   collector_name: string | null
 }
+
+type SampleException = {
+  id: number
+  resource_type: string
+  resource_id: number
+  status: string
+}
+
+type AnalysisJob = {
+  id: number
+  sample_id: number
+  status: string
+  job_type: string
+}
+
+type UiTone = 'error' | 'primary' | 'secondary' | 'success' | 'info' | 'warning' | 'neutral'
 
 type PaginatedResponse<T> = {
   data: T[]
@@ -47,11 +65,40 @@ const query = computed(() => ({
 
 const { data, pending, error, refresh } = await useFetch<PaginatedResponse<Sample>>('/api/samples', {
   baseURL,
+  key: () => `samples-list-${JSON.stringify(query.value)}`,
   query
+})
+
+const { data: exceptionsData, pending: exceptionsPending, error: exceptionsError } = await useFetch<PaginatedResponse<SampleException>>('/api/exceptions', {
+  baseURL,
+  key: () => `samples-exceptions-${JSON.stringify(query.value)}`,
+  query: { resource_type: 'sample', page_size: 200 }
+})
+
+const { data: analysisJobsData, pending: analysisJobsPending, error: analysisJobsError } = await useFetch<PaginatedResponse<AnalysisJob>>('/api/analysis-jobs', {
+  baseURL,
+  key: () => `samples-analysis-jobs-${JSON.stringify(query.value)}`,
+  query: { page_size: 200 }
 })
 
 const samples = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta?.total ?? 0)
+const sampleExceptions = computed(() => (exceptionsData.value?.data ?? []).filter(item => item.resource_type === 'sample'))
+const sampleAnalysisJobs = computed(() => analysisJobsData.value?.data ?? [])
+const sampleListItems = computed(() => samples.value.map((sample) => {
+  const preview = buildSampleListItemPreview({
+    sample,
+    results: [],
+    exceptions: sampleExceptions.value.filter(item => item.resource_id === sample.id),
+    analysisJobs: sampleAnalysisJobs.value.filter(item => item.sample_id === sample.id)
+  })
+
+  return {
+    ...sample,
+    preview
+  }
+}))
+const samplePreviewTone = (tone: string) => tone as UiTone
 
 const showCreateForm = ref(false)
 const createPending = ref(false)
@@ -279,14 +326,14 @@ const createSample = async () => {
             </UCard>
 
             <UAlert
-              v-if="error"
+              v-if="error || exceptionsError || analysisJobsError"
               color="error"
               variant="soft"
               title="样本列表加载失败"
               :description="'请检查后端接口或稍后重试。'"
             />
 
-            <UCard v-else-if="pending">
+            <UCard v-else-if="pending || exceptionsPending || analysisJobsPending">
               <div class="space-y-3">
                 <div class="h-5 w-40 rounded bg-muted/60" />
                 <div class="h-20 rounded-2xl bg-muted/40" />
@@ -311,12 +358,15 @@ const createSample = async () => {
             </UCard>
 
             <div v-else class="grid gap-4">
-              <UCard v-for="sample in samples" :key="sample.id">
+              <UCard v-for="sample in sampleListItems" :key="sample.id">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div class="space-y-3">
                     <div class="flex flex-wrap items-center gap-2">
                       <UBadge color="primary" variant="soft">
                         {{ sample.status }}
+                      </UBadge>
+                      <UBadge :color="samplePreviewTone(sample.preview.tone)" variant="outline">
+                        {{ sample.preview.nextAction }}
                       </UBadge>
                       <span class="text-xs uppercase tracking-[0.2em] text-muted">
                         {{ sample.sample_code }}
@@ -330,6 +380,19 @@ const createSample = async () => {
                       <p class="mt-1 text-sm text-toned">
                         {{ sample.location_text || '未记录采样位置' }}
                       </p>
+                      <p class="mt-3 text-sm font-medium text-highlighted">
+                        {{ sample.preview.summary }}
+                      </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 text-xs text-muted">
+                      <span
+                        v-for="chip in sample.preview.chips"
+                        :key="chip"
+                        class="rounded-full bg-muted px-3 py-1"
+                      >
+                        {{ chip }}
+                      </span>
                     </div>
 
                     <dl class="grid gap-3 text-sm text-toned sm:grid-cols-2 xl:grid-cols-4">
@@ -369,6 +432,9 @@ const createSample = async () => {
                   </div>
 
                   <div class="flex shrink-0 items-center gap-3 lg:flex-col lg:items-end">
+                    <span class="text-sm text-toned">
+                      建议动作：{{ sample.preview.nextAction }}
+                    </span>
                     <UButton :to="`/samples/${sample.id}`" trailing icon="i-lucide-chevron-right">
                       查看详情
                     </UButton>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { buildSampleWorkspaceGuidance } from '../../utils/sampleWorkspaceGuidance.js'
 import { buildSampleImageSuggestionView } from '../../utils/sampleImageSuggestionView.js'
+import { buildSampleHistoryPreview } from '../../utils/sampleWorkspaceOverview.js'
+import { buildImageSuggestionToast, formatDateTimeInShanghai, shouldPollImageSuggestion } from '../../utils/sampleWorkspaceFeedback.js'
 
 type SampleMainImage = {
   file_name: string
@@ -190,16 +192,21 @@ type ImageSuggestionResponse = {
 
 const route = useRoute()
 const { baseURL, request, getErrorMessage } = useApiClient()
+const toast = useToast()
+
+type ToastTone = 'error' | 'primary' | 'secondary' | 'success' | 'info' | 'warning' | 'neutral'
 
 const sampleId = computed(() => String(route.params.id))
 
 const { data, pending, error, refresh: refreshSample } = await useFetch<DetailResponse<SampleDetail>>(() => `/api/samples/${sampleId.value}`, {
   baseURL,
+  key: () => `sample-detail-${sampleId.value}`,
   watch: [sampleId]
 })
 
 const { data: resultsData, pending: resultsPending, error: resultsError, refresh: refreshResults } = await useFetch<DetailResponse<SampleResult[]>>(() => `/api/samples/${sampleId.value}/results`, {
   baseURL,
+  key: () => `sample-results-${sampleId.value}`,
   watch: [sampleId]
 })
 
@@ -210,6 +217,7 @@ const exceptionQuery = computed(() => ({
 
 const { data: exceptionsData, pending: exceptionsPending, error: exceptionsError, refresh: refreshExceptions } = await useFetch<PaginatedResponse<SampleException>>('/api/exceptions', {
   baseURL,
+  key: () => `sample-exceptions-${sampleId.value}`,
   query: exceptionQuery
 })
 
@@ -219,11 +227,13 @@ const analysisJobQuery = computed(() => ({
 
 const { data: analysisJobsData, pending: analysisJobsPending, error: analysisJobsError, refresh: refreshAnalysisJobs } = await useFetch<PaginatedResponse<AnalysisJob>>('/api/analysis-jobs', {
   baseURL,
+  key: () => `sample-analysis-jobs-${sampleId.value}`,
   query: analysisJobQuery
 })
 
 const { data: imageSuggestionData, pending: imageSuggestionPending, error: imageSuggestionError, refresh: refreshImageSuggestion } = await useFetch<ImageSuggestionResponse>(() => `/api/samples/${sampleId.value}/image-suggestion`, {
   baseURL,
+  key: () => `sample-image-suggestion-${sampleId.value}`,
   watch: [sampleId]
 })
 
@@ -231,7 +241,10 @@ const sample = computed(() => data.value?.data ?? null)
 const results = computed(() => resultsData.value?.data ?? [])
 const exceptions = computed(() => exceptionsData.value?.data ?? [])
 const analysisJobs = computed(() => analysisJobsData.value?.data ?? [])
+const objectDetectionJobs = computed(() => analysisJobs.value.filter(item => item.job_type === 'object_detection'))
 const imageSuggestion = computed(() => imageSuggestionData.value?.data ?? null)
+const previousImageSuggestionState = ref<string | null>(null)
+const imageSuggestionPollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const openExceptions = computed(() => exceptions.value.filter(item => item.status === 'open'))
 const failedAnalysisJobs = computed(() => analysisJobs.value.filter(item => item.status === 'failed'))
 const activeAnalysisJobs = computed(() => analysisJobs.value.filter(item => item.status === 'queued' || item.status === 'running'))
@@ -246,6 +259,8 @@ const workspaceGuidance = computed(() => sample.value ? buildSampleWorkspaceGuid
   exceptions: exceptions.value,
   analysisJobs: analysisJobs.value
 }) : null)
+const historyPreview = computed(() => buildSampleHistoryPreview(objectDetectionJobs.value))
+const historyExpanded = ref(false)
 
 const resultTypeOptions = [
   {
@@ -707,16 +722,7 @@ const retryAnalysisJob = async (job: AnalysisJob) => {
   await runAnalysisJobAction(job.id, `/api/analysis-jobs/${job.id}/retry`, '分析任务已重新发起，原失败记录已保留。')
 }
 
-const formatDateTime = (value: string | null) => {
-  if (!value) {
-    return '未设置'
-  }
-
-  return new Intl.DateTimeFormat('zh-CN', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(new Date(value))
-}
+const formatDateTime = (value: string | null) => formatDateTimeInShanghai(value)
 
 const stringifyValue = (value: unknown) => {
   if (value == null) {
@@ -831,15 +837,15 @@ const runImageSuggestionPrimaryAction = async () => {
 const workspaceGuidanceActionLabel = (action: string) => {
   switch (action) {
     case 'result':
-      return '去录入结果'
+      return '新增结果'
     case 'exception':
-      return '去处理异常'
+      return '记录异常'
     case 'retry-analysis':
-      return '重新发起分析'
+      return '重新检测'
     case 'wait':
-      return '刷新分析状态'
+      return '刷新状态'
     default:
-      return '继续处理样本'
+      return '查看样本'
   }
 }
 
@@ -874,16 +880,72 @@ const runWorkspaceNextStep = async () => {
         await retryAnalysisJob(failedJob)
         return
       }
-      openCreateAnalysisJob()
+      await createObjectDetectionJob()
       return
     }
     case 'wait':
-      await refreshAnalysisJobs()
+      await Promise.all([refreshAnalysisJobs(), refreshImageSuggestion()])
       return
     default:
-      openCreateAnalysisJob()
+      return
   }
 }
+
+const stopImageSuggestionPolling = () => {
+  if (imageSuggestionPollTimer.value) {
+    clearInterval(imageSuggestionPollTimer.value)
+    imageSuggestionPollTimer.value = null
+  }
+}
+
+const ensureImageSuggestionPolling = () => {
+  if (imageSuggestionPollTimer.value) {
+    return
+  }
+
+  imageSuggestionPollTimer.value = setInterval(async () => {
+    await Promise.all([refreshImageSuggestion(), refreshAnalysisJobs()])
+  }, 3000)
+}
+
+watch(() => imageSuggestion.value?.state ?? null, (nextState) => {
+  if (!nextState) {
+    previousImageSuggestionState.value = nextState
+    stopImageSuggestionPolling()
+    return
+  }
+
+  if (shouldPollImageSuggestion(nextState)) {
+    ensureImageSuggestionPolling()
+  }
+  else {
+    stopImageSuggestionPolling()
+  }
+
+  const toastConfig = buildImageSuggestionToast({
+    previousState: previousImageSuggestionState.value,
+    nextState,
+    summary: imageSuggestion.value?.summary ?? undefined
+  })
+
+  if (toastConfig) {
+    analysisJobSuccess.value = toastConfig.description
+    toast.add({
+      title: toastConfig.title,
+      description: toastConfig.description,
+      color: toastConfig.color as ToastTone,
+      icon: toastConfig.icon
+    })
+  }
+
+  previousImageSuggestionState.value = nextState
+}, {
+  immediate: true
+})
+
+onBeforeUnmount(() => {
+  stopImageSuggestionPolling()
+})
 </script>
 
 <template>
@@ -969,6 +1031,73 @@ const runWorkspaceNextStep = async () => {
                   <dd class="mt-1 text-default">{{ formatDateTime(sample.received_at) }}</dd>
                 </div>
               </dl>
+            </div>
+          </UCard>
+
+          <UCard v-if="workspaceGuidance">
+            <template #header>
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UBadge :color="workspaceGuidance.summaryTone" variant="soft">
+                      推荐下一步
+                    </UBadge>
+                    <span class="text-xs uppercase tracking-[0.18em] text-muted">
+                      Sample Workspace
+                    </span>
+                  </div>
+                  <h2 class="mt-3 text-lg font-semibold text-highlighted">
+                    {{ workspaceGuidance.summaryTitle }}
+                  </h2>
+                  <p class="mt-1 text-sm text-toned">
+                    {{ workspaceGuidance.nextStep.description }}
+                  </p>
+                </div>
+
+                <UButton
+                  :icon="workspaceGuidanceActionIcon(workspaceGuidance.nextStep.action)"
+                  @click="runWorkspaceNextStep"
+                >
+                  {{ workspaceGuidanceActionLabel(workspaceGuidance.nextStep.action) }}
+                </UButton>
+              </div>
+            </template>
+
+            <div class="space-y-4">
+              <div v-if="workspaceGuidance.risks.length > 0" class="space-y-3">
+                <div
+                  v-for="risk in workspaceGuidance.risks"
+                  :key="risk.kind"
+                  class="rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm"
+                >
+                  <p class="font-medium text-highlighted">
+                    {{ risk.title }}
+                  </p>
+                  <p class="mt-1 text-toned">
+                    {{ risk.description }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="rounded-2xl bg-primary/5 px-4 py-4 text-sm">
+                <p class="text-xs uppercase tracking-[0.18em] text-muted">
+                  推荐动作
+                </p>
+                <p class="mt-2 font-medium text-highlighted">
+                  {{ workspaceGuidance.nextStep.title }}
+                </p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <UButton color="primary" variant="soft" icon="i-lucide-flask-conical" @click="openCreateResult()">
+                    新增结果
+                  </UButton>
+                  <UButton color="warning" variant="soft" icon="i-lucide-alert-triangle" @click="openCreateException()">
+                    记录异常
+                  </UButton>
+                  <UButton color="neutral" variant="outline" icon="i-lucide-sparkles" @click="runImageSuggestionPrimaryAction">
+                    {{ imageSuggestionActionLabel(imageSuggestionView.primaryAction) }}
+                  </UButton>
+                </div>
+              </div>
             </div>
           </UCard>
 
@@ -1115,7 +1244,7 @@ const runWorkspaceNextStep = async () => {
                   当前还没有检测结果
                 </h3>
                 <p class="mt-1 text-sm text-toned">
-                  这一块已经准备好承接后续的结果录入、异常登记和分析任务发起能力。
+                  当前还没有人工确认的正式结果，建议根据自动检测建议或现场判断补录结果。
                 </p>
               </div>
             </div>
@@ -1379,261 +1508,6 @@ const runWorkspaceNextStep = async () => {
             </div>
           </UCard>
 
-          <UCard>
-            <template #header>
-              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <h2 class="text-lg font-semibold text-highlighted">
-                    分析任务
-                  </h2>
-                  <p class="mt-1 text-sm text-toned">
-                    围绕当前样本发起质量评估或异常扫描，并在这里查看任务状态。
-                  </p>
-                </div>
-
-                <UButton icon="i-lucide-sparkles" @click="openCreateAnalysisJob">
-                  发起分析
-                </UButton>
-              </div>
-            </template>
-
-            <div v-if="showCreateAnalysisJob" class="mb-4 rounded-2xl border border-default bg-muted/20 p-4">
-              <div class="mb-4 flex items-start justify-between gap-4">
-                <div>
-                  <h3 class="text-base font-semibold text-highlighted">
-                    发起分析任务
-                  </h3>
-                  <p class="mt-1 text-sm text-toned">
-                    第一版只支持最小任务类型集合，参数系统后续再扩展。
-                  </p>
-                </div>
-
-                <UButton type="button" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="关闭分析任务表单" @click="showCreateAnalysisJob = false" />
-              </div>
-
-              <form class="space-y-4" @submit.prevent="createAnalysisJob">
-                <div class="grid gap-4 md:grid-cols-2">
-                  <label class="block space-y-2 text-sm text-toned">
-                    <span class="font-medium text-highlighted">分析类型</span>
-                    <select v-model="analysisJobForm.job_type" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
-                      <option v-for="option in analysisJobTypeOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                      </option>
-                    </select>
-                  </label>
-
-                  <label class="block space-y-2 text-sm text-toned">
-                    <span class="font-medium text-highlighted">发起人 ID</span>
-                    <input v-model.trim="analysisJobForm.queued_by" type="number" min="1" class="w-full rounded-xl border border-default bg-default px-3 py-2 text-default transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary">
-                  </label>
-                </div>
-
-                <div class="rounded-2xl bg-primary/5 px-4 py-3 text-sm text-toned">
-                  <p>
-                    当前样本上下文：<span class="font-semibold text-highlighted">#{{ sample.id }}</span>
-                  </p>
-                  <p class="mt-1">
-                    任务创建后会进入 <span class="font-semibold text-highlighted">queued</span> 状态，并计入首页分析任务摘要。
-                  </p>
-                </div>
-
-                <UAlert
-                  v-if="analysisJobError"
-                  color="error"
-                  variant="soft"
-                  title="分析任务发起失败"
-                  :description="analysisJobError"
-                />
-
-                <div class="flex flex-wrap gap-3">
-                  <UButton type="submit" :loading="analysisJobCreatePending">
-                    提交任务
-                  </UButton>
-                  <UButton type="button" color="neutral" variant="outline" @click="resetAnalysisJobForm()">
-                    重置表单
-                  </UButton>
-                </div>
-              </form>
-            </div>
-
-            <UAlert
-              v-if="analysisJobSuccess"
-              class="mb-4"
-              color="success"
-              variant="soft"
-              title="分析任务已创建"
-              :description="analysisJobSuccess"
-            />
-
-            <UAlert
-              v-if="analysisJobsError"
-              color="error"
-              variant="soft"
-              title="分析任务列表加载失败"
-              :description="'请稍后重试。'"
-            />
-
-            <div v-else-if="analysisJobsPending" class="space-y-3">
-              <div class="h-20 rounded-2xl bg-muted/40" />
-              <div class="h-20 rounded-2xl bg-muted/40" />
-            </div>
-
-            <div v-else-if="analysisJobs.length === 0" class="flex flex-col items-center justify-center gap-3 py-10 text-center">
-              <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <UIcon name="i-lucide-sparkles" class="size-6" />
-              </div>
-              <div>
-                <h3 class="text-base font-semibold text-highlighted">
-                  当前没有分析任务
-                </h3>
-                <p class="mt-1 text-sm text-toned">
-                  当需要对当前样本进行质量评估或异常扫描时，可以在这里直接发起分析任务。
-                </p>
-              </div>
-            </div>
-
-            <div v-else class="space-y-4">
-              <UCard v-for="job in analysisJobs" :key="job.id" class="bg-muted/20">
-                <div class="space-y-3 text-sm">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <UBadge :color="analysisJobStatusTone(job.status)" variant="soft">
-                      {{ analysisJobStatusLabel(job.status) }}
-                    </UBadge>
-                    <span class="text-xs uppercase tracking-[0.18em] text-muted">
-                      {{ analysisJobTypeLabel(job.job_type) }}
-                    </span>
-                    <span class="text-xs text-muted">
-                      #{{ job.id }}
-                    </span>
-                  </div>
-
-                  <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <div>
-                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
-                        发起人
-                      </p>
-                      <p class="mt-1 text-toned">
-                        {{ job.queued_by?.display_name || '未记录' }}
-                      </p>
-                    </div>
-                    <div>
-                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
-                        入队时间
-                      </p>
-                      <p class="mt-1 text-toned">
-                        {{ formatDateTime(job.queued_at) }}
-                      </p>
-                    </div>
-                    <div>
-                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
-                        开始时间
-                      </p>
-                      <p class="mt-1 text-toned">
-                        {{ formatDateTime(job.started_at) }}
-                      </p>
-                    </div>
-                    <div>
-                      <p class="text-xs uppercase tracking-[0.18em] text-muted">
-                        完成时间
-                      </p>
-                      <p class="mt-1 text-toned">
-                        {{ formatDateTime(job.finished_at) }}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div v-if="job.status === 'succeeded' && job.result_summary">
-                    <p class="text-xs uppercase tracking-[0.18em] text-muted">
-                      结果摘要
-                    </p>
-                    <p class="mt-1 text-toned">
-                      {{ job.result_summary }}
-                    </p>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                      <UButton color="primary" variant="soft" icon="i-lucide-flask-conical" @click="openCreateResult()">
-                        去录入结果
-                      </UButton>
-                      <UButton color="warning" variant="soft" icon="i-lucide-alert-triangle" @click="openCreateException()">
-                        记录异常
-                      </UButton>
-                      <span class="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs text-toned">
-                        也可以暂不处理，稍后回到该样本继续判断。
-                      </span>
-                    </div>
-                  </div>
-
-                  <div v-if="job.status === 'failed' && job.error_message">
-                    <p class="text-xs uppercase tracking-[0.18em] text-muted">
-                      失败原因
-                    </p>
-                    <p class="mt-1 text-error">
-                      {{ job.error_message }}
-                    </p>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                      <UButton
-                        color="primary"
-                        variant="soft"
-                        icon="i-lucide-rotate-ccw"
-                        :loading="analysisJobActionPendingId === job.id"
-                        @click="retryAnalysisJob(job)"
-                      >
-                        重新发起分析
-                      </UButton>
-                      <UButton color="warning" variant="soft" icon="i-lucide-alert-triangle" @click="openCreateException()">
-                        记录异常
-                      </UButton>
-                    </div>
-                  </div>
-
-                  <div v-if="job.status === 'queued'" class="flex flex-wrap gap-2">
-                    <UButton
-                      color="primary"
-                      variant="soft"
-                      icon="i-lucide-play"
-                      :loading="analysisJobActionPendingId === job.id"
-                      @click="startAnalysisJob(job)"
-                    >
-                      开始执行
-                    </UButton>
-                    <UButton
-                      color="neutral"
-                      variant="outline"
-                      icon="i-lucide-ban"
-                      :loading="analysisJobActionPendingId === job.id"
-                      @click="cancelAnalysisJob(job)"
-                    >
-                      取消任务
-                    </UButton>
-                  </div>
-
-                  <div v-if="job.status === 'running'" class="flex flex-wrap gap-2">
-                    <UButton
-                      color="success"
-                      variant="soft"
-                      icon="i-lucide-check"
-                      :loading="analysisJobActionPendingId === job.id"
-                      @click="succeedAnalysisJob(job)"
-                    >
-                      标记成功
-                    </UButton>
-                    <UButton
-                      color="error"
-                      variant="soft"
-                      icon="i-lucide-x"
-                      :loading="analysisJobActionPendingId === job.id"
-                      @click="failAnalysisJob(job)"
-                    >
-                      标记失败
-                    </UButton>
-                  </div>
-
-                  <div v-if="job.status === 'cancelled'" class="rounded-2xl bg-muted/50 px-4 py-3 text-xs text-toned">
-                    该分析任务已取消，不会继续执行。若仍需分析当前样本，可重新发起新的分析任务。
-                  </div>
-                </div>
-              </UCard>
-            </div>
-          </UCard>
         </div>
 
         <div class="space-y-4">
@@ -1746,6 +1620,14 @@ const runWorkspaceNextStep = async () => {
                 :description="'请稍后刷新页面重试。'"
               />
 
+              <UAlert
+                v-if="analysisJobSuccess"
+                color="success"
+                variant="soft"
+                title="自动检测状态已更新"
+                :description="analysisJobSuccess"
+              />
+
               <div v-else-if="imageSuggestionPending" class="space-y-3">
                 <div class="h-20 rounded-2xl bg-muted/40" />
                 <div class="h-20 rounded-2xl bg-muted/40" />
@@ -1793,138 +1675,67 @@ const runWorkspaceNextStep = async () => {
             </div>
           </UCard>
 
-          <UCard v-if="workspaceGuidance">
+          <UCard>
             <template #header>
-              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div class="flex items-start justify-between gap-4">
                 <div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <UBadge :color="workspaceGuidance.summaryTone" variant="soft">
-                      工作台摘要
-                    </UBadge>
-                    <span class="text-xs uppercase tracking-[0.18em] text-muted">
-                      Sample Workspace
-                    </span>
-                  </div>
-                  <h2 class="mt-3 text-lg font-semibold text-highlighted">
-                    {{ workspaceGuidance.summaryTitle }}
+                  <h2 class="text-lg font-semibold text-highlighted">
+                    自动检测历史
                   </h2>
                   <p class="mt-1 text-sm text-toned">
-                    {{ workspaceGuidance.summaryDescription }}
+                    保留最近的自动检测记录，默认只显示 3 条，避免历史信息干扰当前判断。
                   </p>
                 </div>
 
                 <UButton
-                  :icon="workspaceGuidanceActionIcon(workspaceGuidance.nextStep.action)"
-                  @click="runWorkspaceNextStep"
+                  color="neutral"
+                  variant="outline"
+                  :icon="historyExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                  @click="historyExpanded = !historyExpanded"
                 >
-                  {{ workspaceGuidanceActionLabel(workspaceGuidance.nextStep.action) }}
+                  {{ historyExpanded ? '收起历史' : `查看历史（${historyPreview.totalCount}）` }}
                 </UButton>
               </div>
             </template>
 
-            <div class="space-y-4">
-              <div class="grid gap-3 sm:grid-cols-2">
-                <div
-                  v-for="stat in workspaceGuidance.stats"
-                  :key="stat.label"
-                  class="rounded-2xl border border-default bg-muted/20 px-4 py-3"
-                >
-                  <p class="text-xs uppercase tracking-[0.18em] text-muted">
-                    {{ stat.label }}
-                  </p>
-                  <p class="mt-2 text-2xl font-semibold text-highlighted">
-                    {{ stat.value }}
-                  </p>
-                </div>
-              </div>
+            <UAlert
+              v-if="analysisJobsError"
+              color="error"
+              variant="soft"
+              title="自动检测历史加载失败"
+              :description="'请稍后重试。'"
+            />
 
-              <div class="rounded-2xl bg-primary/5 px-4 py-4 text-sm">
-                <p class="text-xs uppercase tracking-[0.18em] text-muted">
-                  推荐下一步
-                </p>
-                <p class="mt-2 font-medium text-highlighted">
-                  {{ workspaceGuidance.nextStep.title }}
-                </p>
-                <p class="mt-1 text-toned">
-                  {{ workspaceGuidance.nextStep.description }}
-                </p>
-              </div>
-
-              <div v-if="workspaceGuidance.risks.length > 0" class="space-y-3">
-                <div
-                  v-for="risk in workspaceGuidance.risks"
-                  :key="risk.kind"
-                  class="rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm"
-                >
-                  <p class="font-medium text-highlighted">
-                    {{ risk.title }}
-                  </p>
-                  <p class="mt-1 text-toned">
-                    {{ risk.description }}
-                  </p>
-                </div>
-              </div>
-
-              <div class="flex flex-wrap gap-2">
-                <UButton color="primary" variant="soft" icon="i-lucide-flask-conical" @click="openCreateResult()">
-                  新增结果
-                </UButton>
-                <UButton color="warning" variant="soft" icon="i-lucide-alert-triangle" @click="openCreateException()">
-                  记录异常
-                </UButton>
-                <UButton color="neutral" variant="outline" icon="i-lucide-sparkles" @click="openCreateAnalysisJob()">
-                  发起分析
-                </UButton>
-              </div>
+            <div v-else-if="analysisJobsPending" class="space-y-3">
+              <div class="h-20 rounded-2xl bg-muted/40" />
+              <div class="h-20 rounded-2xl bg-muted/40" />
             </div>
-          </UCard>
 
-          <UCard>
-            <template #header>
-              <div>
-                <h2 class="text-lg font-semibold text-highlighted">
-                  关联工作流
-                </h2>
-                <p class="mt-1 text-sm text-toned">
-                  在巡检任务、样本结果与后续分析动作之间保持最小可导航关系。
-                </p>
-              </div>
-            </template>
+            <div v-else-if="historyPreview.totalCount === 0" class="rounded-2xl border border-dashed border-default bg-muted/10 px-4 py-8 text-center text-sm text-toned">
+              当前还没有自动检测历史，运行自动检测后会在这里保留最近记录。
+            </div>
 
-            <div class="flex flex-col gap-3">
-              <div class="rounded-2xl bg-primary/5 px-4 py-3 text-sm text-toned">
-                <p>
-                  当前样本状态：<span class="font-semibold text-highlighted">{{ sample.status }}</span>
-                </p>
-                <p class="mt-1">
-                  结果录入成功后，`registered` / `received` 样本会自动推进到 `testing`。
-                </p>
-                <p v-if="openExceptions.length > 0" class="mt-1">
-                  当前仍有 <span class="font-semibold text-highlighted">{{ openExceptions.length }}</span> 条未解决异常，需要结合现场情况继续判断。
-                </p>
-                <p v-if="failedAnalysisJobs.length > 0" class="mt-1">
-                  当前有 <span class="font-semibold text-highlighted">{{ failedAnalysisJobs.length }}</span> 个失败分析任务，建议优先查看失败原因或重新发起分析。
-                </p>
-                <p v-if="activeAnalysisJobs.length > 0" class="mt-1">
-                  当前还有 <span class="font-semibold text-highlighted">{{ activeAnalysisJobs.length }}</span> 个待执行或执行中的分析任务。
-                </p>
-              </div>
-
-              <UButton
-                v-if="sample.inspection_task_id"
-                :to="`/inspections/${sample.inspection_task_id}`"
-                color="neutral"
-                variant="outline"
-                icon="i-lucide-clipboard-check"
+            <div v-else class="space-y-3">
+              <div
+                v-for="item in (historyExpanded ? historyPreview.allItems : historyPreview.items)"
+                :key="item.id"
+                class="rounded-2xl border border-default bg-muted/20 px-4 py-3 text-sm"
               >
-                查看来源任务 #{{ sample.inspection_task_id }}
-              </UButton>
-
-              <UButton to="/samples" color="neutral" variant="outline" icon="i-lucide-list">
-                返回样本列表
-              </UButton>
+                <div class="flex flex-wrap items-center gap-2">
+                  <UBadge :color="analysisJobStatusTone(item.status)" variant="soft">
+                    {{ item.statusLabel }}
+                  </UBadge>
+                  <span class="text-xs text-muted">
+                    {{ formatDateTime(item.time) }}
+                  </span>
+                </div>
+                <p class="mt-2 text-toned">
+                  {{ item.summary }}
+                </p>
+              </div>
             </div>
           </UCard>
+
         </div>
       </div>
     </template>

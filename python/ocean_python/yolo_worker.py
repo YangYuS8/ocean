@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from pathlib import Path
 from typing import Any
 from urllib import error, parse, request
+
+
+logger = logging.getLogger(__name__)
 
 
 def build_suggestion_payload(detections: list[dict[str, Any]]) -> dict[str, Any]:
@@ -141,6 +145,27 @@ class UltralyticsDetector:
         return detections
 
 
+def run_worker_iteration(*, api_client: Any, detector: Any, storage_root: Path) -> int:
+    try:
+        jobs = api_client.list_queued_jobs()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("failed to fetch queued jobs: %s", exc)
+        return 0
+
+    processed = 0
+
+    for job in jobs:
+        process_job(
+            int(job["id"]),
+            api_client=api_client,
+            detector=detector,
+            storage_root=storage_root,
+        )
+        processed += 1
+
+    return processed
+
+
 def run_worker_loop() -> None:  # pragma: no cover - exercised in container
     base_url = os.environ.get("OCEAN_API_BASE", "http://nginx")
     model_path = os.environ.get("OCEAN_YOLO_MODEL_PATH")
@@ -156,18 +181,13 @@ def run_worker_loop() -> None:  # pragma: no cover - exercised in container
     detector = UltralyticsDetector(model_path)
 
     while True:
-        jobs = api_client.list_queued_jobs()
-        if not jobs:
+        processed = run_worker_iteration(
+            api_client=api_client,
+            detector=detector,
+            storage_root=storage_root,
+        )
+        if processed == 0:
             time.sleep(poll_seconds)
-            continue
-
-        for job in jobs:
-            process_job(
-                int(job["id"]),
-                api_client=api_client,
-                detector=detector,
-                storage_root=storage_root,
-            )
 
 
 if __name__ == "__main__":  # pragma: no cover - exercised in container

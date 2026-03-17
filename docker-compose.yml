@@ -58,6 +58,7 @@ services:
 
   python:
     container_name: ocean-python
+    restart: unless-stopped
     build:
       context: ./python
       args:

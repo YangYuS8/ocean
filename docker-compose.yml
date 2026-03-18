@@ -87,7 +87,7 @@ services:
 
   db:
     container_name: ocean-db
-    image: docker.io/library/mariadb:11
+    image: docker.io/library/mariadb:12
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-test_db}

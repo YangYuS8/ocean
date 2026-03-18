@@ -100,7 +100,7 @@ services:
 
   redis:
     container_name: ocean-redis
-    image: docker.io/library/redis:7-alpine
+    image: docker.io/library/redis:8-alpine
     volumes:
       - redis-data:/data
     ports:

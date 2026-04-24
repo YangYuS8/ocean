@@ -16,6 +16,16 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       NUXT_PUBLIC_API_BASE: http://nginx
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     networks:
@@ -51,8 +61,10 @@ services:
       - ./backend:/var/www/html:Z
       - ./nginx:/etc/nginx/conf.d:ro,Z
     depends_on:
-      - frontend
-      - php
+      frontend:
+        condition: service_healthy
+      php:
+        condition: service_started
     networks:
       - ocean
 

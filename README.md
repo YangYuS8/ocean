@@ -155,7 +155,13 @@ pnpm dev
 
 当前首页已接入真实摘要接口，使用 `NUXT_PUBLIC_API_BASE` 指向后端入口。
 
-前端容器启动后会在容器内执行 `pnpm install && pnpm dev`；本地开发时也可直接在 `frontend/` 目录中运行相同命令。
+前端容器会在镜像构建阶段安装依赖，容器启动时直接执行 `pnpm dev`；本地开发时也可直接在 `frontend/` 目录中运行相同命令。
+
+如果修改了 `frontend/package.json` 或 `frontend/pnpm-lock.yaml`，需要重新构建前端镜像：
+
+```bash
+docker compose up -d --build frontend
+```
 
 ## 后端与数据库
 

@@ -11,4 +11,9 @@ ENV PORT=3000
 
 RUN corepack enable
 
-CMD ["sh", "-c", "corepack prepare pnpm@10.30.3 --activate && pnpm install --prefer-offline && pnpm dev --host ${HOST} --port ${PORT}"]
+COPY . .
+
+RUN corepack prepare pnpm@10.30.3 --activate \
+    && pnpm install --frozen-lockfile --prefer-offline
+
+CMD ["sh", "-c", "pnpm dev --host ${HOST} --port ${PORT}"]

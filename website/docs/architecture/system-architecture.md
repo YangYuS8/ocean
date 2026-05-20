@@ -1,0 +1,98 @@
+---
+title: System Architecture
+---
+
+# System Architecture
+
+## High-level topology
+
+```text
+Browser
+  -> Nginx
+      -> React SPA static assets
+      -> Laravel API (/api)
+          -> MariaDB
+          -> Redis
+          -> Python Worker
+```
+
+## Component responsibilities
+
+### Laravel API
+
+Laravel is the center of the business system. It is responsible for:
+
+- exposing `/api` endpoints
+- enforcing business rules and state transitions
+- owning migrations and seeders
+- serving as the future integration point for authentication, authorization, auditing, and queue orchestration
+
+### React / TypeScript SPA
+
+The business frontend should exist as a standalone SPA that:
+
+- consumes Laravel APIs
+- hosts the task, sample, result, exception, and analysis workflows
+- ships as static assets served by Nginx
+
+### Python Worker
+
+Python is reserved for analysis and algorithm execution, including:
+
+- image processing
+- automatic suggestion generation
+- model inference
+- background execution for `analysis_jobs`
+
+### MariaDB
+
+MariaDB remains the core transactional store for:
+
+- inspection tasks
+- samples
+- sample results
+- exceptions
+- analysis jobs
+- users and roles
+
+### Redis
+
+Redis remains the async boundary used to:
+
+- decouple Laravel from Python workers
+- support queueing, retries, and later orchestration work
+
+### Nginx
+
+Nginx remains the unified entry point that:
+
+- proxies Laravel API traffic
+- serves SPA build output
+- hides internal service topology from end users
+
+## Core business chain
+
+```text
+inspection_tasks
+  -> samples
+      -> sample_results
+      -> exceptions
+      -> analysis_jobs
+```
+
+## Analysis job flow
+
+```text
+User action
+  -> Laravel creates analysis_jobs(queued)
+  -> Redis / controlled async boundary
+  -> Python Worker consumes the job
+  -> Laravel writes back running / succeeded / failed status
+```
+
+## Design principles
+
+1. **Backend-centric rules**: state machines and validation stay in Laravel.
+2. **Separated concerns**: the frontend consumes APIs instead of owning SSR responsibilities.
+3. **Isolated async execution**: Python does not own the main transactional workflow.
+4. **Stable deployment path**: Nginx + Docker Compose stays the main delivery model.

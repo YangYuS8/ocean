@@ -1,0 +1,44 @@
+:root {
+  --ifm-color-primary: #0d6f8f;
+  --ifm-color-primary-dark: #0c6481;
+  --ifm-color-primary-darker: #0b5e79;
+  --ifm-color-primary-darkest: #094d63;
+  --ifm-color-primary-light: #0e7a9d;
+  --ifm-color-primary-lighter: #1080a6;
+  --ifm-color-primary-lightest: #1495c1;
+  --ifm-code-font-size: 95%;
+  --ifm-background-surface-color: #f6fbfd;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #47b7da;
+  --ifm-background-surface-color: #10222a;
+}
+
+.hero--ocean {
+  background: linear-gradient(135deg, #073b4c 0%, #118ab2 55%, #7bdff2 100%);
+  color: #fff;
+}
+
+.hero--ocean .button.button--secondary {
+  color: #073b4c;
+}
+
+.ocean-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.ocean-card {
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 16px;
+  padding: 1.25rem;
+  background: var(--ifm-background-surface-color);
+  box-shadow: 0 8px 24px rgba(8, 54, 73, 0.08);
+}
+
+.ocean-card h3 {
+  margin-bottom: 0.5rem;
+}

@@ -1,0 +1,58 @@
+{
+  "theme.NavBarItem.label.Docs": {
+    "message": "文档",
+    "description": "Navbar item with label Docs"
+  },
+  "theme.NavBarItem.label.Overview": {
+    "message": "总览",
+    "description": "Navbar item with label Overview"
+  },
+  "theme.docs.sidebar.Architecture": {
+    "message": "架构设计",
+    "description": "Sidebar category label Architecture"
+  },
+  "theme.docs.sidebar.Product and Scope": {
+    "message": "产品与范围",
+    "description": "Sidebar category label Product and Scope"
+  },
+  "theme.docs.sidebar.API and Data": {
+    "message": "接口与数据",
+    "description": "Sidebar category label API and Data"
+  },
+  "theme.docs.sidebar.Deployment and Operations": {
+    "message": "部署运维",
+    "description": "Sidebar category label Deployment and Operations"
+  },
+  "theme.docs.sidebar.Decision History": {
+    "message": "历史决策",
+    "description": "Sidebar category label Decision History"
+  },
+  "theme.docs.sidebar.category.Architecture.linkLabel": {
+    "message": "架构设计",
+    "description": "The label for category Architecture in sidebar docsSidebar"
+  },
+  "theme.docs.sidebar.category.Product and Scope.linkLabel": {
+    "message": "产品与范围",
+    "description": "The label for category Product and Scope in sidebar docsSidebar"
+  },
+  "theme.docs.sidebar.category.API and Data.linkLabel": {
+    "message": "接口与数据",
+    "description": "The label for category API and Data in sidebar docsSidebar"
+  },
+  "theme.docs.sidebar.category.Deployment and Operations.linkLabel": {
+    "message": "部署运维",
+    "description": "The label for category Deployment and Operations in sidebar docsSidebar"
+  },
+  "theme.docs.sidebar.category.Decision History.linkLabel": {
+    "message": "历史决策",
+    "description": "The label for category Decision History in sidebar docsSidebar"
+  },
+  "theme.docs.breadcrumbs.home": {
+    "message": "首页",
+    "description": "Breadcrumbs home label"
+  },
+  "theme.docs.breadcrumbs.docs": {
+    "message": "文档",
+    "description": "Breadcrumbs docs label"
+  }
+}

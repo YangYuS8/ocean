@@ -83,5 +83,6 @@ docker exec ocean-php php /var/www/html/artisan migrate:status
 
 ## 简体中文
 
+- 简体中文版 README：`README.zh-Hans.md`
 - 中文文档入口：`website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/intro.md`
 - 构建后的站点可通过语言切换器进入简体中文版本。

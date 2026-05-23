@@ -9,6 +9,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'architecture/tech-stack',
         'architecture/system-architecture',
+        'architecture/frontend-transition',
       ],
     },
     {

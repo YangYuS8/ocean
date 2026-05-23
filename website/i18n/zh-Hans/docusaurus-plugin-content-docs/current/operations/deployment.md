@@ -18,6 +18,21 @@ Python Worker
 Docker Compose
 ```
 
+## v1.1 前端迁移部署说明
+
+仓库现在包含两条前端线，职责不同：
+
+- `frontend/`：保留当前 Nuxt/Vue 运行时，用于现行流程
+- `frontend-spa/`：目标 React/Vite SPA 基线，用于静态构建产物
+
+v1.1.0 **不会**立刻把默认部署切到 SPA，而是交付后续切换所需的可落地基础：
+
+- 可独立构建、输出到 `frontend-spa/dist` 的 SPA
+- 用于托管该目录的 Nginx 示例配置
+- 用于静态 SPA 构建的 Compose override / Dockerfile 示例
+
+这样可以在不破坏现有 `docker-compose.yml` 和当前运行方式的前提下，把目标路径固定下来。
+
 ## Laravel 运行要求
 
 - Laravel 继续作为统一后端入口
@@ -88,6 +103,23 @@ docker exec ocean-php php /var/www/html/artisan migrate:status
 - 文档构建与业务服务构建分离
 - 文档可以独立发布
 - 站点默认语言为英文，简体中文通过 i18n 提供
+
+## SPA 目标静态托管示例
+
+当 React/Vite 线路成为主工作台前端后，推荐托管模式为：
+
+1. 将 `frontend-spa/` 构建为 `frontend-spa/dist`
+2. 把 dist 目录挂载或复制到 Nginx 镜像 / 主机目录
+3. `/` 通过 SPA fallback 返回 `index.html`
+4. `/api/` 反向代理到 Laravel / PHP 入口
+
+本次迁移新增的示例文件包括：
+
+- `nginx/spa-target.conf.example`
+- `frontend-spa/Dockerfile`
+- `docker-compose.spa.example.yml`
+
+这些文件仅作为目标示例，不会替换当前默认部署。
 
 ## 长期不推荐的方向
 

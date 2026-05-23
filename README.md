@@ -70,6 +70,7 @@ docker exec ocean-php php /var/www/html/artisan migrate:status
 
 - `backend/`: Laravel backend and the legacy lightweight PHP reference baseline
 - `frontend/`: existing frontend implementation from the earlier phase
+- `frontend-spa/`: React + TypeScript + Vite SPA transition baseline for the long-term frontend mainline
 - `python/`: Python worker and model runtime
 - `nginx/`: Nginx configuration
 - `website/`: bilingual Docusaurus documentation site

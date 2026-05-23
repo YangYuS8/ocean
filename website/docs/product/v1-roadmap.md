@@ -46,24 +46,31 @@ Prepare the business frontend to move toward a Laravel API + React/TypeScript SP
 - define the transition target from the current frontend phase to the SPA mainline
 - identify API consumption boundaries required by the new frontend
 - keep deployment assumptions aligned with Nginx and Compose
+- ship a minimal React/Vite workspace skeleton without replacing the current Nuxt runtime
 
 ### Primary deliverables
 
 - documented frontend transition baseline
+- `frontend-spa/` React + TypeScript + Vite scaffold
 - API integration assumptions for the new SPA
 - deployment notes covering static asset serving through Nginx
+- target static build and container examples that do not break the current Compose line
 
 ### Exit criteria
 
 - the frontend direction is unambiguous for the delivery team
 - no critical product area depends on SSR-specific behavior
 - the target integration contract for the SPA is documented
+- the repository contains a buildable SPA baseline with configurable `VITE_API_BASE`
+- the Nuxt implementation remains available for the current running path during transition
 
 ## v1.2.0 — Core Workspace Completion
 
 ### Goal
 
 Complete the core internal workspace around inspection tasks, samples, results, exceptions, and summary views.
+
+This is the version where the React/Vite frontend is expected to move beyond the transition skeleton and take on the main core workspace delivery.
 
 ### Scope
 

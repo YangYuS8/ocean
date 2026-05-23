@@ -9,12 +9,22 @@ title: 系统架构
 ```text
 Browser
   -> Nginx
-      -> React SPA 静态资源
+      -> React SPA 静态资源（目标主线）
+      -> Nuxt 前端运行时（当前过渡流）
       -> Laravel API (/api)
           -> MariaDB
           -> Redis
           -> Python Worker
 ```
+
+## v1.1 过渡状态
+
+平台当前处于前端迁移期：
+
+- `frontend/` 继续作为当前运行流使用的 Nuxt/Vue 实现
+- `frontend-spa/` 在 v1.1.0 中新增，作为目标 React + TypeScript + Vite 基线
+- Laravel 继续维持稳定的 `/api` 契约，以支持两条前端线并存
+- Nginx 继续作为边界层，可在过渡期承接 Nuxt 路径和目标静态 SPA 路径
 
 ## 组件职责
 
@@ -34,6 +44,13 @@ Laravel 是业务系统中心，负责：
 - 消费 Laravel API
 - 承载任务、样本、结果、异常和分析流程
 - 输出由 Nginx 托管的静态资源
+- 从 `VITE_API_BASE` 读取 API 根路径，默认 `/api`
+
+在 v1.1.0 中，这条 SPA 只交付基础骨架，用于证明目标运行时、API 边界与静态部署形态，而不是立刻替换现有 Nuxt 流。
+
+### Nuxt / Vue 过渡前端
+
+现有 Nuxt 前端在迁移期仍然保留，因为它继续承接当前可运行流程。但从架构定位上，它现在应被视为过渡实现，而不是长期业务前端主线。
 
 ### Python Worker
 
@@ -96,3 +113,4 @@ inspection_tasks
 2. **关注点分离**：前端消费 API，而不是承担 SSR 运行时职责。
 3. **异步执行隔离**：Python 不接管主事务工作流。
 4. **部署路径稳定**：Nginx + Docker Compose 继续作为主交付模型。
+5. **受控前端迁移**：v1.1 先建立并存与部署边界，v1.2 再把核心工作区交付迁移到 SPA。

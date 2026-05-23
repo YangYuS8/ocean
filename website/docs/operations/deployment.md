@@ -18,6 +18,21 @@ Python Worker
 Docker Compose
 ```
 
+## v1.1 frontend transition deployment note
+
+The repository now contains two frontend lines with different roles:
+
+- `frontend/`: current Nuxt/Vue runtime kept for the active flow
+- `frontend-spa/`: target React/Vite SPA baseline for static build output
+
+v1.1.0 does **not** switch the default deployment to the SPA yet. Instead, it delivers the deployable foundation required for the later cutover:
+
+- a standalone SPA build that outputs `frontend-spa/dist`
+- an example Nginx config for serving that directory
+- an example Compose override / Dockerfile path for static SPA builds
+
+This keeps the existing `docker-compose.yml` and current runtime behavior intact while making the target path concrete.
+
 ## Laravel runtime requirements
 
 - Laravel remains the unified backend entry point
@@ -88,6 +103,23 @@ The delivery rules are:
 - documentation build stays separate from business service builds
 - documentation can be published independently
 - English is the default locale and Simplified Chinese remains available through i18n
+
+## SPA target static hosting example
+
+When the React/Vite line becomes the active workspace frontend, the intended serving pattern is:
+
+1. build `frontend-spa/` into `frontend-spa/dist`
+2. mount or copy the dist output into an Nginx image or host path
+3. serve `/` through SPA fallback to `index.html`
+4. reverse proxy `/api/` to the Laravel / PHP entry point
+
+The sample files added for this transition are:
+
+- `nginx/spa-target.conf.example`
+- `frontend-spa/Dockerfile`
+- `docker-compose.spa.example.yml`
+
+They are examples only and intentionally do not replace the current default deployment.
 
 ## Long-term direction explicitly not recommended
 

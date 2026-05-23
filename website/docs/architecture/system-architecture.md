@@ -9,12 +9,22 @@ title: System Architecture
 ```text
 Browser
   -> Nginx
-      -> React SPA static assets
+      -> React SPA static assets (target mainline)
+      -> Nuxt frontend runtime (transitional current flow)
       -> Laravel API (/api)
           -> MariaDB
           -> Redis
           -> Python Worker
 ```
+
+## Transition status in v1.1
+
+The platform is intentionally in a frontend transition period:
+
+- `frontend/` remains the active Nuxt/Vue implementation for the current running flow
+- `frontend-spa/` is introduced in v1.1.0 as the target React + TypeScript + Vite baseline
+- Laravel keeps the stable `/api` contract so both frontend lines can coexist during migration
+- Nginx remains the boundary that can switch between the transitional Nuxt path and the target static SPA path
 
 ## Component responsibilities
 
@@ -34,6 +44,13 @@ The business frontend should exist as a standalone SPA that:
 - consumes Laravel APIs
 - hosts the task, sample, result, exception, and analysis workflows
 - ships as static assets served by Nginx
+- reads its API root from `VITE_API_BASE`, defaulting to `/api`
+
+In v1.1.0, this SPA is delivered as a foundation skeleton only. It proves the target runtime, API boundary, and static deployment shape without replacing the existing Nuxt flow yet.
+
+### Nuxt / Vue transitional frontend
+
+The existing Nuxt frontend remains in place during the transition because it still carries the current working flow. It should now be treated as a transitional implementation rather than the long-term business frontend mainline.
 
 ### Python Worker
 
@@ -96,3 +113,4 @@ User action
 2. **Separated concerns**: the frontend consumes APIs instead of owning SSR responsibilities.
 3. **Isolated async execution**: Python does not own the main transactional workflow.
 4. **Stable deployment path**: Nginx + Docker Compose stays the main delivery model.
+5. **Controlled frontend transition**: v1.1 establishes coexistence and deployment boundaries before v1.2 moves core workspace delivery onto the SPA.

@@ -83,10 +83,12 @@ title: P0 API
 - `GET /api/samples/{id}/results`
 - `POST /api/samples/{id}/results`
 
-当前规则：
+v1.0.0 冻结规则：
 
 - `raw_value` 和 `normalized_value` 使用 JSON 结构
 - 新结果记录默认进入 `draft`
+- `GET /api/samples/{id}/results` 必须遵循统一列表响应，固定返回 `data + meta`
+- 创建结果时不得依赖前端驱动样本状态；样本状态规则由后端执行
 
 ### Exceptions
 

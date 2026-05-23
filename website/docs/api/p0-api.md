@@ -83,10 +83,12 @@ Typical filters:
 - `GET /api/samples/{id}/results`
 - `POST /api/samples/{id}/results`
 
-Current rules:
+Frozen v1.0.0 rules:
 
 - `raw_value` and `normalized_value` use JSON structures
 - new result records start in `draft`
+- `GET /api/samples/{id}/results` is a unified list response and always returns `data + meta`
+- creating a result never relies on frontend-driven sample status changes; the backend applies sample state rules
 
 ### Exceptions
 

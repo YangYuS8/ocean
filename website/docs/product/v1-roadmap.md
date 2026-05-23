@@ -31,6 +31,9 @@ Lock down the backend, data, and API baseline required for all later v1 work.
 - the team agrees on the long-term stack direction
 - P0 API and state semantics are documented in one stable location
 - `website/` builds successfully and becomes the documentation source of truth
+- frozen response conventions include unified list `meta`, including `GET /api/samples/{id}/results`
+- sample P0 state advancement is explicitly backend-owned for result intake
+- initialization includes an idempotent seeded core-chain verification example
 
 ## v1.1.0 — Frontend Transition Foundation
 

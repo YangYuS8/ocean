@@ -86,7 +86,9 @@ registered -> received -> testing -> reviewed -> archived
 Notes:
 
 - `POST /api/samples` starts at `registered`
-- sample status can be advanced through related business actions in the current P0 phase
+- sample status is advanced by backend service rules in the current P0 phase
+- explicit v1.0.0 P0 rule: creating a sample result moves `registered` or `received` to `testing`
+- explicit v1.0.0 P0 rule: `invalid` and `archived` samples cannot accept new result records and must return `409 INVALID_STATE`
 
 ### sample_results
 
@@ -156,3 +158,4 @@ Key retry rule:
 - Laravel migration and seeder are the long-term initialization path
 - raw SQL drafts may remain reference material, but not the primary lifecycle path
 - baseline roles should include `inspector`, `analyst`, and `admin`
+- baseline seeder should provide one idempotent core-chain example: `inspection_task + sample + sample_result + exception + analysis_job`

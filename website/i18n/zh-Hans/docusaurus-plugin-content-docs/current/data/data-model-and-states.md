@@ -86,7 +86,9 @@ registered -> received -> testing -> reviewed -> archived
 说明：
 
 - `POST /api/samples` 创建时默认 `registered`
-- 当前 P0 可通过相关业务动作内聚推进样本状态
+- 当前 P0 的样本状态推进由后端服务层规则显式负责
+- v1.0.0 P0 明确规则：创建 sample result 时，`registered` 或 `received` 推进到 `testing`
+- v1.0.0 P0 明确规则：`invalid` 和 `archived` 状态的样本禁止接收新结果，并返回 `409 INVALID_STATE`
 
 ### sample_results
 
@@ -156,3 +158,4 @@ queued -> running -> succeeded
 - Laravel migration / seeder 是长期初始化主路径
 - 原始 SQL 草案可以保留为参考资料，但不再是主生命周期入口
 - 基础角色至少包括 `inspector`、`analyst` 和 `admin`
+- baseline seeder 需要提供一条幂等的核心链路样例：`inspection_task + sample + sample_result + exception + analysis_job`

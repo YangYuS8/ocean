@@ -96,6 +96,38 @@ class SampleService
         ];
     }
 
+    public function getStatusSnapshot(int $id): object
+    {
+        $sample = DB::table('samples')->select(['id', 'status'])->where('id', $id)->first();
+
+        if (!$sample) {
+            throw new ApiException('NOT_FOUND', 'sample not found', 404);
+        }
+
+        return $sample;
+    }
+
+    public function assertCanAcceptResult(object $sample): void
+    {
+        if (in_array($sample->status, ['invalid', 'archived'], true)) {
+            throw new ApiException('INVALID_STATE', 'sample cannot accept results in current state', 409);
+        }
+    }
+
+    public function advanceToTestingWhenReceivingResult(object $sample): string
+    {
+        if (!in_array($sample->status, ['registered', 'received'], true)) {
+            return $sample->status;
+        }
+
+        DB::table('samples')->where('id', $sample->id)->update([
+            'status' => 'testing',
+            'updated_at' => now(),
+        ]);
+
+        return 'testing';
+    }
+
     public function show(int $id): array
     {
         $sample = DB::table('samples as s')

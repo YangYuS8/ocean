@@ -126,6 +126,39 @@ Make analysis jobs a real, traceable async execution loop instead of a static re
 
 The v1.3 line uses MariaDB as the durable `analysis_jobs` source of truth and Redis as the worker handoff boundary. Laravel stores the job row, pushes a compact payload to `ANALYSIS_JOB_REDIS_QUEUE`, and the Python worker consumes that queue before calling the Laravel API to start, succeed, or fail the job. The worker still keeps the HTTP queued-list path as a compatibility fallback for older environments.
 
+## v1.3.x — Frontend Usability and Componentization Follow-through
+
+### Goal
+
+Turn the default SPA from a connected MVP workspace into a maintainable React 19 operational console.
+
+### Scope
+
+- make language switching explicit and visible in the workspace header
+- replace the single-canvas workspace with section navigation for Overview, Tasks, Samples, Results, Exceptions, and Analysis
+- split the frontend into reusable workspace components, feature panels, and a dedicated workspace state/API hook
+- standardize `frontend-spa/` local development and container build commands on `pnpm`
+- keep i18n resources as the only place for user-facing SPA labels
+- unify the visual language around Mantine theme tokens plus Tailwind utility classes, rather than scattered one-off CSS
+
+### Primary deliverables
+
+- `App.tsx` reduced to composition rather than business logic and form orchestration
+- shared components under `src/components/workspace/`
+- workspace feature code under `src/features/workspace/`
+- committed `pnpm-lock.yaml` for reproducible SPA installs
+- updated Docker build path using `pnpm install --frozen-lockfile` and `pnpm run build`
+- documented frontend visual standards for typography scale, color palette, border radius, shadows, layout density, and anti-patterns to avoid
+
+### Exit criteria
+
+- users can find the Chinese/English language switch without hunting through dense controls
+- each major workspace capability is reachable through a clear section tab
+- no new v1.3.x workspace feature requires appending another large block to `App.tsx`
+- `pnpm run build` succeeds in `frontend-spa/`
+- `website` documentation remains synchronized in English and Simplified Chinese
+- new SPA UI work follows the documented Mantine/Tailwind design language instead of introducing ad hoc gradients, oversized typography, or inconsistent radii
+
 ## v1.4.0 — Governance and Operations
 
 ### Goal

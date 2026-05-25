@@ -5,7 +5,7 @@ Ocean is an internal platform for marine ecological sample management and equipm
 ## Recommended long-term mainline
 
 - Backend: `Laravel` (must remain)
-- Business frontend mainline: `React + TypeScript + Vite` SPA
+- Business frontend mainline: `React 19 + TypeScript + Vite` SPA with Mantine, Tailwind CSS, and react-i18next
 - Async analysis: `Python Worker`
 - Database: `MariaDB`
 - Queue / decoupling boundary: `Redis`
@@ -66,11 +66,21 @@ docker exec ocean-php php /var/www/html/artisan route:list --path=api
 docker exec ocean-php php /var/www/html/artisan migrate:status
 ```
 
+### Frontend SPA development
+
+`frontend-spa/` uses `pnpm` as its preferred package manager:
+
+```bash
+cd frontend-spa
+pnpm install
+pnpm run build
+```
+
 ## Main directories
 
 - `backend/`: Laravel backend and the legacy lightweight PHP reference baseline
 - `frontend/`: earlier Nuxt/Vue implementation retained as reference material
-- `frontend-spa/`: active React + TypeScript + Vite SPA workspace served by the default Compose/Nginx runtime
+- `frontend-spa/`: active React 19 + TypeScript + Vite SPA workspace served by the default Compose/Nginx runtime
 - `python/`: Python worker and model runtime
 - `nginx/`: Nginx configuration
 - `website/`: bilingual Docusaurus documentation site

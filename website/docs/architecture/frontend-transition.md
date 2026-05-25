@@ -96,8 +96,32 @@ This keeps the business frontend deployable as static assets and avoids introduc
 - `frontend/` remains in the repository only as an earlier-phase reference implementation
 - the long-term default path is now Browser -> Nginx -> React/Vite SPA static assets -> `/api/` Laravel
 
+### v1.3.x frontend design-system correction
+
+- the SPA is upgraded to React 19 and uses Mantine 9 as its open-source component system
+- Tailwind CSS is available through the official Vite plugin for page-level layout, spacing, and utility styling
+- `react-i18next` provides the in-app language switcher and translation resource boundary
+- Simplified Chinese is the default operational language, with an explicit `Display language` switcher in the workspace header
+- the UI direction is a restrained marine operations console inspired by Mantine dashboard/AppShell examples: off-white page background, white bordered surfaces, slate/navy text, teal primary actions, amber/red status accents, and compact operational density
+- the design language uses a consistent 12px default radius, 16px major-surface radius, restrained shadows, 14-16px body text, 20-22px panel headings, and 30-36px page headings
+- avoid glassmorphism, radial gradients, decorative blobs, oversized hero typography, and inconsistent one-off radii/colors unless a documented design decision supersedes this standard
+- the frontend remains API-driven and static-asset deployable; component-library adoption must not move validation, workflow transitions, or audit-sensitive rules out of Laravel
+
+### v1.3.x componentization correction
+
+- the SPA should not keep every capability in a single giant page or a single giant `App.tsx`
+- `App.tsx` should remain a composition layer only: wire the workspace hook, shell, navigation, and feature panels
+- shared presentation belongs under `src/components/workspace/`
+- workspace state, API orchestration, form state, and derived values belong under `src/features/workspace/`
+- each business slice should have its own panel module under `src/features/workspace/panels/`
+- the default page should expose section navigation for Overview, Tasks, Samples, Results, Exceptions, and Analysis instead of forcing all forms and lists into one continuous canvas
+- `pnpm` is the preferred package manager for `frontend-spa/`; keep `pnpm-lock.yaml` committed and use `pnpm run build` for SPA validation
+
 ## Repository guidance
 
 - keep `frontend/` intact as reference material unless a later version explicitly retires it
 - place new long-term workspace frontend work under `frontend-spa/`
 - keep docs, deployment samples, and architecture language aligned with this transition plan
+- keep user-facing SPA copy in the i18n resource boundary instead of scattering hardcoded mixed-language strings across components
+- keep the SPA component tree modular enough that adding v1.3.x panels does not require expanding `App.tsx`
+- keep Mantine theme tokens and Tailwind utility usage aligned; do not create competing color/radius/spacing systems in ad hoc CSS

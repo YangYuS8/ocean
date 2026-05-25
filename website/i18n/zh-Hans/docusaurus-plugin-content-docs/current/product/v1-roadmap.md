@@ -126,6 +126,39 @@ title: v1 路线图
 
 v1.3 线路以 MariaDB 中的 `analysis_jobs` 作为持久事实来源，并以 Redis 作为 Worker 交接边界。Laravel 写入任务记录后，会把精简任务载荷推入 `ANALYSIS_JOB_REDIS_QUEUE`；Python Worker 先消费该队列，再调用 Laravel API 将任务推进到 running、succeeded 或 failed。为兼容旧环境，Worker 仍保留 HTTP 排队列表作为兜底路径。
 
+## v1.3.x — 前端可用性与组件化补齐
+
+### 目标
+
+把默认 SPA 从“已打通的 MVP 工作台”推进为更可维护的 React 19 运营控制台。
+
+### 范围
+
+- 在工作台头部提供明确可见的语言切换入口
+- 用总览、任务、样本、结果、异常、分析的分区导航替代单一长页面
+- 将前端拆分为可复用工作台组件、功能面板和专用 workspace 状态 / API hook
+- 将 `frontend-spa/` 的本地开发与容器构建命令统一到 `pnpm`
+- 用户可见 SPA 文案只维护在 i18n 资源边界中
+- 围绕 Mantine theme tokens 与 Tailwind 工具类统一视觉语言，而不是继续散落一次性 CSS
+
+### 主要交付物
+
+- `App.tsx` 收敛为组合层，不再承载业务逻辑和表单编排
+- `src/components/workspace/` 下的共享组件
+- `src/features/workspace/` 下的工作台功能代码
+- 提交 `pnpm-lock.yaml`，保证 SPA 安装可复现
+- Docker 构建路径使用 `pnpm install --frozen-lockfile` 和 `pnpm run build`
+- 文档化前端视觉标准，包括字号层级、颜色、圆角、阴影、布局密度和应避免的反模式
+
+### 退出标准 / 验收标准
+
+- 用户无需在密集控件中寻找，就能看到中文 / 英文切换入口
+- 每个主要工作台能力都能通过清晰的分区标签进入
+- 后续 v1.3.x 工作台功能不应再通过扩写 `App.tsx` 大块代码实现
+- `frontend-spa/` 中 `pnpm run build` 成功
+- 英文与简体中文文档保持同步
+- 新增 SPA UI 工作遵循已文档化的 Mantine/Tailwind 设计语言，不再引入临时渐变、过大字号或不一致圆角
+
 ## v1.4.0 — 治理与运维
 
 ### 目标

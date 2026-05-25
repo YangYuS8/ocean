@@ -90,8 +90,14 @@ Browser
 - 让 SPA 成为核心内部工作台的主要交付载体
 - 逐步降低对过渡期 Nuxt 路径的依赖
 
+### v1.3.x 修正
+
+- 默认 Docker Compose 与 Nginx 入口现在服务 `frontend-spa/`，不再服务过渡期 Nuxt 运行时
+- `frontend/` 仍保留在仓库中，但仅作为早期阶段参考实现
+- 长期默认路径已经切换为 Browser -> Nginx -> React/Vite SPA 静态资源 -> `/api/` Laravel
+
 ## 仓库维护指导
 
-- 除非后续版本明确退役，否则保留 `frontend/`
+- 除非后续版本明确退役，否则将 `frontend/` 作为参考资料保留
 - 新的长期工作台前端能力应优先放在 `frontend-spa/`
 - 文档、部署样例与架构表述应持续与本迁移方案保持一致

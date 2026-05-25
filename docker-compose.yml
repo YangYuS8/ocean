@@ -4,30 +4,19 @@ services:
   frontend:
     container_name: ocean-frontend
     build:
-      context: ./frontend
-      args:
-        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
-    volumes:
-      - ./frontend:/app:Z
-      - frontend-node-modules:/app/node_modules
-      - frontend-pnpm-store:/pnpm
-    environment:
-      NPM_CONFIG_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
-      HOST: 0.0.0.0
-      PORT: 3000
-      NUXT_PUBLIC_API_BASE: http://nginx
+      context: ./frontend-spa
     healthcheck:
       test:
         - CMD
-        - node
-        - -e
-        - fetch('http://127.0.0.1:3000/').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))
+        - wget
+        - -qO-
+        - http://127.0.0.1/
       interval: 5s
       timeout: 3s
       retries: 20
       start_period: 10s
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-3000}:80"
     networks:
       - ocean
 
@@ -142,10 +131,6 @@ networks:
     name: ocean-network
 
 volumes:
-  frontend-node-modules:
-    name: ocean-frontend-node-modules
-  frontend-pnpm-store:
-    name: ocean-frontend-pnpm-store
   python-uv-cache:
     name: ocean-python-uv-cache
   python-venv:

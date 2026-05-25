@@ -90,8 +90,14 @@ This keeps the business frontend deployable as static assets and avoids introduc
 - make the SPA the main delivery vehicle for the core internal workspace
 - reduce remaining dependency on the transitional Nuxt path
 
+### v1.3.x correction
+
+- the default Docker Compose and Nginx entrypoint now serve `frontend-spa/` instead of the transitional Nuxt runtime
+- `frontend/` remains in the repository only as an earlier-phase reference implementation
+- the long-term default path is now Browser -> Nginx -> React/Vite SPA static assets -> `/api/` Laravel
+
 ## Repository guidance
 
-- keep `frontend/` intact unless a later version explicitly retires it
+- keep `frontend/` intact as reference material unless a later version explicitly retires it
 - place new long-term workspace frontend work under `frontend-spa/`
 - keep docs, deployment samples, and architecture language aligned with this transition plan

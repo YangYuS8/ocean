@@ -92,6 +92,10 @@ This is the version where the React/Vite frontend is expected to move beyond the
 - key list/detail/action flows are operational against live APIs
 - failure and empty states are addressed for core pages
 
+### v1.3.x correction
+
+The default Compose/Nginx runtime now serves the React/Vite SPA, completing the practical frontend cutover that v1.2.0 intended. The old Nuxt implementation remains available as repository reference material, not the default runtime.
+
 ## v1.3.0 — Async Analysis Loop
 
 ### Goal

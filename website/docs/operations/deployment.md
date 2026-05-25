@@ -121,22 +121,23 @@ The delivery rules are:
 - documentation can be published independently
 - English is the default locale and Simplified Chinese remains available through i18n
 
-## SPA target static hosting example
+## Default SPA static hosting
 
-When the React/Vite line becomes the active workspace frontend, the intended serving pattern is:
+The default Compose path now serves the React/Vite workspace frontend:
 
-1. build `frontend-spa/` into `frontend-spa/dist`
-2. mount or copy the dist output into an Nginx image or host path
-3. serve `/` through SPA fallback to `index.html`
-4. reverse proxy `/api/` to the Laravel / PHP entry point
+1. `frontend` builds from `frontend-spa/Dockerfile`
+2. the SPA image serves static assets on port `80` with history fallback to `index.html`
+3. top-level Nginx proxies `/` to the SPA container
+4. top-level Nginx routes `/api/` to the Laravel / PHP entry point
 
-The sample files added for this transition are:
+The relevant files are:
 
-- `nginx/spa-target.conf.example`
+- `nginx/default.conf`
 - `frontend-spa/Dockerfile`
-- `docker-compose.spa.example.yml`
+- `frontend-spa/nginx.conf`
+- `docker-compose.yml`
 
-They are examples only and intentionally do not replace the current default deployment.
+The earlier `frontend/` Nuxt implementation remains in the repository as a reference implementation, but it is no longer the default Compose/Nginx runtime.
 
 ## Long-term direction explicitly not recommended
 

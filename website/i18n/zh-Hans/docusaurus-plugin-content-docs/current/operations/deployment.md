@@ -121,22 +121,23 @@ docker exec ocean-redis redis-cli LLEN ocean:analysis-jobs:queued
 - 文档可以独立发布
 - 站点默认语言为英文，简体中文通过 i18n 提供
 
-## SPA 目标静态托管示例
+## 默认 SPA 静态托管
 
-当 React/Vite 线路成为主工作台前端后，推荐托管模式为：
+默认 Compose 路径现在服务 React/Vite 工作台前端：
 
-1. 将 `frontend-spa/` 构建为 `frontend-spa/dist`
-2. 把 dist 目录挂载或复制到 Nginx 镜像 / 主机目录
-3. `/` 通过 SPA fallback 返回 `index.html`
-4. `/api/` 反向代理到 Laravel / PHP 入口
+1. `frontend` 服务从 `frontend-spa/Dockerfile` 构建
+2. SPA 镜像在 `80` 端口提供静态资源，并通过 fallback 返回 `index.html`
+3. 顶层 Nginx 将 `/` 代理到 SPA 容器
+4. 顶层 Nginx 将 `/api/` 路由到 Laravel / PHP 入口
 
-本次迁移新增的示例文件包括：
+相关文件包括：
 
-- `nginx/spa-target.conf.example`
+- `nginx/default.conf`
 - `frontend-spa/Dockerfile`
-- `docker-compose.spa.example.yml`
+- `frontend-spa/nginx.conf`
+- `docker-compose.yml`
 
-这些文件仅作为目标示例，不会替换当前默认部署。
+早期 `frontend/` Nuxt 实现仍保留在仓库中作为参考实现，但不再是默认 Compose/Nginx 运行时。
 
 ## 长期不推荐的方向
 

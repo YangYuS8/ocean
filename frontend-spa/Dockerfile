@@ -9,7 +9,7 @@ RUN npm run build
 
 FROM nginx:alpine AS runtime
 COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Provide the default static asset image only.
-# API proxying and SPA fallback should be configured through
-# nginx/spa-target.conf.example or an environment-specific server config.
+# Provide the default static SPA asset image. API proxying remains owned by
+# the top-level nginx service, while this image handles SPA history fallback.

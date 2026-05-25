@@ -56,6 +56,21 @@ class FlakyQueueApiClient:
         return self.jobs
 
 
+class FakeRedisJobQueue:
+    def __init__(self, jobs=None, error=None):
+        self.jobs = list(jobs or [])
+        self.error = error
+        self.pop_calls = 0
+
+    def pop_job(self):
+        self.pop_calls += 1
+        if self.error:
+            raise self.error
+        if not self.jobs:
+            return None
+        return self.jobs.pop(0)
+
+
 class YoloWorkerTests(unittest.TestCase):
     def test_build_suggestion_payload_with_findings(self):
         suggestion = build_suggestion_payload(
@@ -133,6 +148,28 @@ class YoloWorkerTests(unittest.TestCase):
             self.assertEqual([], api_client.succeeded)
             self.assertEqual([(102, "model unavailable")], api_client.failed)
 
+    def test_process_quality_assessment_job_writes_success_without_detector(self):
+        job = {
+            "id": 103,
+            "job_type": "quality_assessment",
+            "params": {"source": "unit-test"},
+        }
+        api_client = FakeApiClient(job)
+        detector = FakeDetector(error=RuntimeError("detector should not be called"))
+
+        processed = process_job(
+            103,
+            api_client=api_client,
+            detector=detector,
+            storage_root=Path("."),
+        )
+
+        self.assertTrue(processed)
+        self.assertEqual([103], api_client.started)
+        self.assertEqual([], detector.calls)
+        self.assertEqual(1, len(api_client.succeeded))
+        self.assertEqual([], api_client.failed)
+
     def test_worker_iteration_survives_transient_queue_fetch_error(self):
         api_client = FlakyQueueApiClient(errors=[RuntimeError("nginx unavailable")])
         detector = FakeDetector()
@@ -145,6 +182,50 @@ class YoloWorkerTests(unittest.TestCase):
 
         self.assertEqual(0, processed)
         self.assertEqual(1, api_client.list_calls)
+        self.assertEqual([], detector.calls)
+
+    def test_worker_iteration_consumes_redis_job_queue(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "sample.jpg"
+            image_path.write_bytes(b"test-image")
+
+            job = {
+                "id": 201,
+                "params": {
+                    "main_image_path": "sample.jpg",
+                },
+            }
+            api_client = FakeApiClient(job)
+            detector = FakeDetector([{"label": "scallop", "confidence": 0.91}])
+            job_queue = FakeRedisJobQueue(jobs=[{"id": 201}])
+
+            processed = run_worker_iteration(
+                api_client=api_client,
+                detector=detector,
+                storage_root=Path(temp_dir),
+                job_queue=job_queue,
+            )
+
+            self.assertEqual(1, processed)
+            self.assertEqual(1, job_queue.pop_calls)
+            self.assertEqual([201], api_client.started)
+            self.assertEqual([str(image_path)], detector.calls)
+
+    def test_worker_iteration_survives_redis_queue_fetch_error(self):
+        api_client = FlakyQueueApiClient()
+        detector = FakeDetector()
+        job_queue = FakeRedisJobQueue(error=RuntimeError("redis unavailable"))
+
+        processed = run_worker_iteration(
+            api_client=api_client,
+            detector=detector,
+            storage_root=Path("."),
+            job_queue=job_queue,
+        )
+
+        self.assertEqual(0, processed)
+        self.assertEqual(1, job_queue.pop_calls)
+        self.assertEqual(0, api_client.list_calls)
         self.assertEqual([], detector.calls)
 
 

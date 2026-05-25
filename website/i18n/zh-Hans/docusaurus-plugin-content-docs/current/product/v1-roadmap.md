@@ -118,6 +118,10 @@ title: v1 路线图
 - 失败任务可重试且不会篡改历史失败记录
 - 用户在任务结束后能看到有效状态与下一步指引
 
+### v1.3.0 实现说明
+
+v1.3 线路以 MariaDB 中的 `analysis_jobs` 作为持久事实来源，并以 Redis 作为 Worker 交接边界。Laravel 写入任务记录后，会把精简任务载荷推入 `ANALYSIS_JOB_REDIS_QUEUE`；Python Worker 先消费该队列，再调用 Laravel API 将任务推进到 running、succeeded 或 failed。为兼容旧环境，Worker 仍保留 HTTP 排队列表作为兜底路径。
+
 ## v1.4.0 — 治理与运维
 
 ### 目标

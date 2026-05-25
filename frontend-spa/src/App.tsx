@@ -1,6 +1,7 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ApiError,
+  AnalysisJob,
   DashboardSummary,
   ExceptionRecord,
   InspectionTask,
@@ -30,6 +31,7 @@ function App() {
   const [samples, setSamples] = useState<Sample[]>([]);
   const [results, setResults] = useState<SampleResult[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionRecord[]>([]);
+  const [analysisJobs, setAnalysisJobs] = useState<AnalysisJob[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [selectedTask, setSelectedTask] = useState<InspectionTask | null>(null);
   const [selectedSampleId, setSelectedSampleId] = useState<number | null>(null);
@@ -58,23 +60,29 @@ function App() {
     title: '',
     description: '',
   });
+  const [analysisJobForm, setAnalysisJobForm] = useState({
+    sample_id: '',
+    job_type: 'quality_assessment',
+  });
 
   const refreshWorkspace = useCallback(async () => {
     setLoadState('loading');
     setNotice(null);
 
     try {
-      const [nextSummary, taskList, sampleList, exceptionList] = await Promise.all([
+      const [nextSummary, taskList, sampleList, exceptionList, analysisJobList] = await Promise.all([
         oceanApi.getDashboardSummary(),
         oceanApi.listInspectionTasks(),
         oceanApi.listSamples(),
         oceanApi.listExceptions(),
+        oceanApi.listAnalysisJobs(),
       ]);
 
       setSummary(nextSummary);
       setTasks(taskList.data);
       setSamples(sampleList.data);
       setExceptions(exceptionList.data);
+      setAnalysisJobs(analysisJobList.data);
       setSelectedTaskId((current) => current ?? taskList.data[0]?.id ?? null);
       setSelectedSampleId((current) => current ?? sampleList.data[0]?.id ?? null);
       setLoadState('ready');
@@ -132,6 +140,11 @@ function App() {
   const activeExceptions = useMemo(
     () => exceptions.filter((exception) => exception.status === 'open'),
     [exceptions],
+  );
+
+  const activeAnalysisJobs = useMemo(
+    () => analysisJobs.filter((job) => job.status === 'queued' || job.status === 'running'),
+    [analysisJobs],
   );
 
   async function handleTaskAction(action: 'start' | 'submit') {
@@ -239,6 +252,36 @@ function App() {
     }
   }
 
+  async function handleCreateAnalysisJob(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    try {
+      const created = await oceanApi.createAnalysisJob({
+        sample_id: Number(analysisJobForm.sample_id),
+        job_type: analysisJobForm.job_type.trim(),
+        queued_by: analystId || undefined,
+      });
+      setNotice({ tone: 'success', message: `Analysis job ${created.id} queued.` });
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice({ tone: 'error', message: formatError(error) });
+    }
+  }
+
+  async function handleAnalysisJobAction(jobId: number, action: 'cancel' | 'retry') {
+    try {
+      if (action === 'cancel') {
+        await oceanApi.cancelAnalysisJob(jobId);
+      } else {
+        await oceanApi.retryAnalysisJob(jobId);
+      }
+      setNotice({ tone: 'success', message: `Analysis job ${action} action completed.` });
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice({ tone: 'error', message: formatError(error) });
+    }
+  }
+
   function setExceptionTarget(resourceType: 'inspection_task' | 'sample' | 'sample_result', resourceId: number | null) {
     setExceptionForm((current) => ({
       ...current,
@@ -247,15 +290,22 @@ function App() {
     }));
   }
 
+  function setAnalysisJobTarget(sampleId: number | null, jobType = 'quality_assessment') {
+    setAnalysisJobForm({
+      sample_id: sampleId?.toString() ?? '',
+      job_type: jobType,
+    });
+  }
+
   return (
     <main className="workspace-shell">
       <header className="workspace-hero">
         <div>
-          <span className="eyebrow">Ocean v1.2.0</span>
+          <span className="eyebrow">Ocean v1.3.0</span>
           <h1>Core Operations Workspace</h1>
           <p className="lead">
-            Connected P0 flows for inspection tasks, samples, results, exceptions, and dashboard
-            summary. API base: <code>{apiBase}</code>
+            Connected P0 flows plus Redis-backed async analysis visibility. API base:{' '}
+            <code>{apiBase}</code>
           </p>
         </div>
         <div className="identity-panel" aria-label="Transitional identity controls">
@@ -411,6 +461,13 @@ function App() {
                 >
                   Report exception
                 </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => setAnalysisJobTarget(selectedSample.id)}
+                  type="button"
+                >
+                  Queue analysis
+                </button>
               </div>
             </div>
           )}
@@ -560,6 +617,68 @@ function App() {
           </div>
           <p className="hint">Open exceptions in this view: {activeExceptions.length}</p>
         </Panel>
+
+        <Panel title="Analysis jobs" subtitle="Queue, monitor, cancel, and retry async worker jobs.">
+          <form className="analysis-form" onSubmit={handleCreateAnalysisJob}>
+            <input
+              min="1"
+              placeholder="Sample ID"
+              required
+              type="number"
+              value={analysisJobForm.sample_id}
+              onChange={(event) =>
+                setAnalysisJobForm({ ...analysisJobForm, sample_id: event.target.value })
+              }
+            />
+            <select
+              value={analysisJobForm.job_type}
+              onChange={(event) =>
+                setAnalysisJobForm({ ...analysisJobForm, job_type: event.target.value })
+              }
+            >
+              <option value="quality_assessment">Quality assessment</option>
+              <option value="object_detection">Object detection</option>
+            </select>
+            <button type="submit">Queue analysis job</button>
+          </form>
+
+          <div className="record-stack">
+            {analysisJobs.length === 0 ? (
+              <EmptyState text="No analysis jobs returned by the API." />
+            ) : (
+              analysisJobs.map((job) => (
+                <article className="record-card" key={job.id}>
+                  <div>
+                    <strong>
+                      {job.job_type} · #{job.id}
+                    </strong>
+                    <p>{analysisJobGuidance(job)}</p>
+                    {job.error_message && <p className="error-text">{job.error_message}</p>}
+                  </div>
+                  <div className="exception-actions">
+                    <StatusBadge value={job.status} />
+                    <button
+                      disabled={job.status !== 'queued'}
+                      onClick={() => void handleAnalysisJobAction(job.id, 'cancel')}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="secondary-button"
+                      disabled={job.status !== 'failed'}
+                      onClick={() => void handleAnalysisJobAction(job.id, 'retry')}
+                      type="button"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+          <p className="hint">Queued or running jobs in this view: {activeAnalysisJobs.length}</p>
+        </Panel>
       </section>
     </main>
   );
@@ -631,6 +750,15 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
 
 function EmptyState({ text }: { text: string }) {
   return <div className="empty-state">{text}</div>;
+}
+
+function analysisJobGuidance(job: AnalysisJob): string {
+  if (job.status === 'queued') return `Sample #${job.sample_id} is waiting for a Python worker.`;
+  if (job.status === 'running') return `Sample #${job.sample_id} is currently being processed.`;
+  if (job.status === 'succeeded') return job.result_summary || 'Analysis completed successfully.';
+  if (job.status === 'failed') return 'Analysis failed. Review the error and retry if appropriate.';
+  if (job.status === 'cancelled') return 'Analysis was cancelled before worker execution.';
+  return `Sample #${job.sample_id}`;
 }
 
 function optionalText(value: string): string | undefined {

@@ -102,10 +102,12 @@ inspection_tasks
 ```text
 用户动作
   -> Laravel 创建 analysis_jobs(queued)
-  -> Redis / 受控异步边界
-  -> Python Worker 消费任务
-  -> Laravel 回写 running / succeeded / failed
+  -> Laravel 将任务 id 推入 Redis 列表 ANALYSIS_JOB_REDIS_QUEUE
+  -> Python Worker 消费 Redis 队列
+  -> Python Worker 调用 Laravel 标记 running / succeeded / failed
 ```
+
+Redis 只承载 Worker 交接载荷。MariaDB 仍是任务状态、参数、摘要、失败、重试和历史记录的持久事实来源。重试失败任务时会创建新的 queued 数据库记录和新的 Redis 队列项，而不是复活原失败记录。
 
 ## 设计原则
 

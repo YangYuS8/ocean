@@ -49,6 +49,8 @@ services:
       DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PREFIX: ""
+      ANALYSIS_JOB_REDIS_QUEUE: ${ANALYSIS_JOB_REDIS_QUEUE:-ocean:analysis-jobs:queued}
     networks:
       - ocean
 
@@ -88,6 +90,7 @@ services:
       OCEAN_STORAGE_ROOT: /workspace/backend-storage
       OCEAN_YOLO_MODEL_PATH: /workspace/models/uprc2018/best.pt
       OCEAN_WORKER_POLL_SECONDS: 3
+      ANALYSIS_JOB_REDIS_QUEUE: ${ANALYSIS_JOB_REDIS_QUEUE:-ocean:analysis-jobs:queued}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       UV_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}

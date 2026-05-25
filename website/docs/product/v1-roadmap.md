@@ -118,6 +118,10 @@ Make analysis jobs a real, traceable async execution loop instead of a static re
 - failed tasks can be retried without mutating historical failed records
 - users can see useful status and next-step guidance after completion
 
+### v1.3.0 implementation note
+
+The v1.3 line uses MariaDB as the durable `analysis_jobs` source of truth and Redis as the worker handoff boundary. Laravel stores the job row, pushes a compact payload to `ANALYSIS_JOB_REDIS_QUEUE`, and the Python worker consumes that queue before calling the Laravel API to start, succeed, or fail the job. The worker still keeps the HTTP queued-list path as a compatibility fallback for older environments.
+
 ## v1.4.0 — Governance and Operations
 
 ### Goal

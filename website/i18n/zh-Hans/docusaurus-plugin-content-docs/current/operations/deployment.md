@@ -58,15 +58,26 @@ docker compose exec php php /var/www/html/artisan migrate:fresh --seed --force
 当前运行假设：
 
 - `analysis_jobs` 已落在 MariaDB
-- Redis 继续作为异步边界
+- Redis 列表 `ANALYSIS_JOB_REDIS_QUEUE` 是 Worker 的异步交接边界
 - Python Worker 处理分析工作负载
 - 默认 YOLO 模型路径为 `python/models/uprc2018/best.pt`
 
 运维上可理解为：
 
 1. Laravel 创建并查询任务
-2. Redis 保留解耦与队列语义
-3. Python Worker 执行并回写结果
+2. Laravel 在数据库持久化成功后，将排队任务 id 推入 Redis
+3. Python Worker 消费 Redis，执行受支持任务，并通过 Laravel API 回写结果
+
+默认队列名为：
+
+```bash
+REDIS_PREFIX=
+ANALYSIS_JOB_REDIS_QUEUE=ocean:analysis-jobs:queued
+```
+
+该 Worker 交接路径中 `REDIS_PREFIX` 应保持为空，以确保 Laravel 与 Python Worker 读写同一个 Redis 列表名。
+
+如果创建任务时 Redis 短暂不可用，数据库中的持久任务记录仍会保留。运维人员可在 Redis 恢复后重试失败任务或重新入队。
 
 ## 常用验证命令
 
@@ -92,6 +103,12 @@ docker exec ocean-php php /var/www/html/artisan route:list --path=api
 
 ```bash
 docker exec ocean-php php /var/www/html/artisan migrate:status
+```
+
+### 分析队列深度
+
+```bash
+docker exec ocean-redis redis-cli LLEN ocean:analysis-jobs:queued
 ```
 
 ## 文档站部署

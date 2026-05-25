@@ -102,10 +102,12 @@ inspection_tasks
 ```text
 User action
   -> Laravel creates analysis_jobs(queued)
-  -> Redis / controlled async boundary
-  -> Python Worker consumes the job
-  -> Laravel writes back running / succeeded / failed status
+  -> Laravel pushes job id to Redis list ANALYSIS_JOB_REDIS_QUEUE
+  -> Python Worker consumes the Redis queue
+  -> Python Worker calls Laravel to mark running / succeeded / failed
 ```
+
+Redis carries only the worker handoff payload. MariaDB remains the durable source of truth for job status, parameters, summaries, failures, retries, and historical records. Retrying a failed job creates a new queued database row and a new Redis queue entry instead of reviving the old failed record.
 
 ## Design principles
 

@@ -58,15 +58,26 @@ docker compose exec php php /var/www/html/artisan migrate:fresh --seed --force
 Current operating assumptions:
 
 - `analysis_jobs` are persisted in MariaDB
-- Redis remains the async boundary
+- Redis list `ANALYSIS_JOB_REDIS_QUEUE` is the async worker handoff boundary
 - Python Worker processes analysis workloads
 - the default YOLO model path is `python/models/uprc2018/best.pt`
 
 Operationally, this should be understood as:
 
 1. Laravel creates and queries jobs
-2. Redis preserves decoupling and queue semantics
-3. Python Worker executes and reports results back
+2. Laravel pushes queued job IDs to Redis after durable database creation
+3. Python Worker consumes Redis, executes supported jobs, and reports results back through Laravel APIs
+
+The default queue name is:
+
+```bash
+REDIS_PREFIX=
+ANALYSIS_JOB_REDIS_QUEUE=ocean:analysis-jobs:queued
+```
+
+`REDIS_PREFIX` should remain empty for this worker handoff path so Laravel and the Python worker read and write the same Redis list name.
+
+If Redis is temporarily unavailable during job creation, the durable database row is still preserved. Operators can retry failed jobs or requeue jobs once Redis is healthy.
 
 ## Common validation commands
 
@@ -92,6 +103,12 @@ docker exec ocean-php php /var/www/html/artisan route:list --path=api
 
 ```bash
 docker exec ocean-php php /var/www/html/artisan migrate:status
+```
+
+### Analysis queue depth
+
+```bash
+docker exec ocean-redis redis-cli LLEN ocean:analysis-jobs:queued
 ```
 
 ## Documentation site deployment

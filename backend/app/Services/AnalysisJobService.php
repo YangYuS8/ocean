@@ -6,10 +6,14 @@ use App\Exceptions\ApiException;
 use App\Services\Concerns\PaginatesQueries;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 
 class AnalysisJobService
 {
     use PaginatesQueries;
+
+    private const REDIS_QUEUE_ENV = 'ANALYSIS_JOB_REDIS_QUEUE';
+    private const DEFAULT_REDIS_QUEUE = 'ocean:analysis-jobs:queued';
 
     public function index(array $query): array
     {
@@ -88,6 +92,8 @@ class AnalysisJobService
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        $this->enqueueForWorker($id, (int) $payload['sample_id'], $payload['job_type']);
 
         return [
             'id' => $id,
@@ -239,6 +245,8 @@ class AnalysisJobService
             'updated_at' => now(),
         ]);
 
+        $this->enqueueForWorker($newId, (int) $job->sample_id, $job->job_type);
+
         return [
             'id' => $newId,
             'sample_id' => (int) $job->sample_id,
@@ -307,6 +315,27 @@ class AnalysisJobService
             'main_image_name' => $sample->main_image_name,
             'main_image_version' => $mainImageVersion,
         ]);
+    }
+
+    private function enqueueForWorker(int $jobId, int $sampleId, string $jobType): void
+    {
+        try {
+            Redis::rpush($this->redisQueueName(), json_encode([
+                'id' => $jobId,
+                'sample_id' => $sampleId,
+                'job_type' => $jobType,
+                'queued_at' => now()->toISOString(),
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        } catch (\Throwable) {
+            // The database record is the durable source of truth. Redis is the async
+            // boundary for workers, but transient Redis outages must not make the
+            // synchronous API create/retry path fail after the row has been stored.
+        }
+    }
+
+    private function redisQueueName(): string
+    {
+        return env(self::REDIS_QUEUE_ENV, self::DEFAULT_REDIS_QUEUE);
     }
 
     private function decodeJson(mixed $value): mixed

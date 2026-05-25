@@ -267,20 +267,23 @@ h3 {
 
 .compact-form,
 .result-form,
-.exception-form {
+.exception-form,
+.analysis-form {
   display: grid;
   gap: 10px;
   margin-bottom: 16px;
 }
 
 .compact-form,
-.exception-form {
+.exception-form,
+.analysis-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .compact-form button,
 .result-form button,
 .exception-form button,
+.analysis-form button,
 .wide-field {
   grid-column: 1 / -1;
 }
@@ -419,6 +422,12 @@ h3 {
   margin-top: 12px;
 }
 
+.error-text {
+  color: #991b1b !important;
+  font-weight: 750;
+  margin-top: 6px;
+}
+
 @media (max-width: 1100px) {
   .workspace-hero,
   .workspace-grid {
@@ -443,6 +452,7 @@ h3 {
 
   .summary-grid,
   .compact-form,
+  .analysis-form,
   .detail-grid,
   .identity-panel {
     grid-template-columns: 1fr;

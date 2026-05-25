@@ -11,6 +11,8 @@ from urllib import error, parse, request
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_REDIS_QUEUE = "ocean:analysis-jobs:queued"
+
 
 def build_suggestion_payload(detections: list[dict[str, Any]]) -> dict[str, Any]:
     counts: dict[str, int] = {}
@@ -43,11 +45,23 @@ def process_job(
 ) -> bool:
     job = api_client.get_job(job_id)
     params = job.get("params") or {}
-    image_path = storage_root / params["main_image_path"]
+    job_type = job.get("job_type")
 
     api_client.start_job(job_id)
 
     try:
+        if job_type == "quality_assessment":
+            suggestion = {
+                "has_findings": False,
+                "counts": {},
+                "confidence_summary": {"top_score": None},
+                "result_summary": "质量评估任务已完成，未发现自动规则异常",
+                "params": params,
+            }
+            api_client.succeed_job(job_id, suggestion["result_summary"], suggestion)
+            return True
+
+        image_path = storage_root / params["main_image_path"]
         detections = detector.detect(str(image_path))
         suggestion = build_suggestion_payload(detections)
         api_client.succeed_job(job_id, suggestion["result_summary"], suggestion)
@@ -66,7 +80,7 @@ class LaravelApiClient:
 
     def list_queued_jobs(self) -> list[dict[str, Any]]:
         query = parse.urlencode(
-            {"job_type": "object_detection", "status": "queued", "page_size": 50}
+            {"status": "queued", "page_size": 50}
         )
         return self._json_request("GET", f"/api/analysis-jobs?{query}")["data"]
 
@@ -116,8 +130,37 @@ class LaravelApiClient:
             raise RuntimeError(body or f"API request failed: {exc.code}") from exc
 
 
+class RedisJobQueue:
+    def __init__(self, *, host: str, port: int, queue_name: str, timeout: int = 1) -> None:
+        try:
+            import redis
+        except ImportError as exc:  # pragma: no cover - depends on runtime env
+            raise RuntimeError("redis package is not installed in python environment") from exc
+
+        self.queue_name = queue_name
+        self.timeout = timeout
+        self.client = redis.Redis(host=host, port=port, decode_responses=True)
+
+    def pop_job(self) -> dict[str, Any] | None:
+        item = self.client.blpop(self.queue_name, timeout=self.timeout)
+        if item is None:
+            return None
+
+        _queue, payload = item
+        decoded = json.loads(payload)
+
+        if not isinstance(decoded, dict) or "id" not in decoded:
+            raise RuntimeError("invalid analysis job queue payload")
+
+        return decoded
+
+
 class UltralyticsDetector:
     def __init__(self, model_path: str) -> None:
+        self.model_path = model_path
+        self.model = None
+
+    def detect(self, image_path: str) -> list[dict[str, Any]]:
         try:
             from ultralytics import YOLO
         except ImportError as exc:  # pragma: no cover - depends on runtime env
@@ -125,9 +168,9 @@ class UltralyticsDetector:
                 "ultralytics is not installed in python environment"
             ) from exc
 
-        self.model = YOLO(model_path)
+        if self.model is None:
+            self.model = YOLO(self.model_path)
 
-    def detect(self, image_path: str) -> list[dict[str, Any]]:
         results = self.model(image_path, verbose=False)
         detections: list[dict[str, Any]] = []
 
@@ -145,7 +188,31 @@ class UltralyticsDetector:
         return detections
 
 
-def run_worker_iteration(*, api_client: Any, detector: Any, storage_root: Path) -> int:
+def run_worker_iteration(
+    *,
+    api_client: Any,
+    detector: Any,
+    storage_root: Path,
+    job_queue: Any | None = None,
+) -> int:
+    if job_queue is not None:
+        try:
+            queued_job = job_queue.pop_job()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("failed to fetch job from redis queue: %s", exc)
+            return 0
+
+        if queued_job is None:
+            return 0
+
+        process_job(
+            int(queued_job["id"]),
+            api_client=api_client,
+            detector=detector,
+            storage_root=storage_root,
+        )
+        return 1
+
     try:
         jobs = api_client.list_queued_jobs()
     except Exception as exc:  # noqa: BLE001
@@ -173,18 +240,31 @@ def run_worker_loop() -> None:  # pragma: no cover - exercised in container
         os.environ.get("OCEAN_STORAGE_ROOT", "/workspace/backend-storage")
     )
     poll_seconds = float(os.environ.get("OCEAN_WORKER_POLL_SECONDS", "3"))
+    redis_host = os.environ.get("REDIS_HOST")
+    redis_port = int(os.environ.get("REDIS_PORT", "6379"))
+    redis_queue_name = os.environ.get("ANALYSIS_JOB_REDIS_QUEUE", DEFAULT_REDIS_QUEUE)
 
     if not model_path:
         raise RuntimeError("OCEAN_YOLO_MODEL_PATH is required")
 
     api_client = LaravelApiClient(base_url)
     detector = UltralyticsDetector(model_path)
+    job_queue = None
+
+    if redis_host:
+        job_queue = RedisJobQueue(
+            host=redis_host,
+            port=redis_port,
+            queue_name=redis_queue_name,
+            timeout=max(1, int(poll_seconds)),
+        )
 
     while True:
         processed = run_worker_iteration(
             api_client=api_client,
             detector=detector,
             storage_root=storage_root,
+            job_queue=job_queue,
         )
         if processed == 0:
             time.sleep(poll_seconds)

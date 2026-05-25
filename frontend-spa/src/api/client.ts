@@ -82,6 +82,21 @@ export type ExceptionRecord = {
   created_at: string | null;
 };
 
+export type AnalysisJob = {
+  id: number;
+  sample_id: number;
+  job_type: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | string;
+  params?: unknown;
+  result_summary: string | null;
+  suggestion: unknown;
+  error_message: string | null;
+  queued_by: PersonRef | null;
+  queued_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+};
+
 export type SampleCreatePayload = {
   sample_code: string;
   sample_type: string;
@@ -110,6 +125,13 @@ export type ExceptionCreatePayload = {
   title: string;
   description?: string;
   reported_by?: number;
+};
+
+export type AnalysisJobCreatePayload = {
+  sample_id: number;
+  job_type: string;
+  params?: Record<string, unknown>;
+  queued_by?: number;
 };
 
 export type MutationResult = {
@@ -222,4 +244,10 @@ export const oceanApi = {
   createException: (payload: ExceptionCreatePayload) => postJson<MutationResult>('/exceptions', payload),
   resolveException: (id: number, resolvedBy: number) =>
     postJson<MutationResult>(`/exceptions/${id}/resolve`, { resolved_by: resolvedBy }),
+
+  listAnalysisJobs: () => listRequest<AnalysisJob>('/analysis-jobs?page_size=20'),
+  createAnalysisJob: (payload: AnalysisJobCreatePayload) =>
+    postJson<MutationResult>('/analysis-jobs', payload),
+  cancelAnalysisJob: (id: number) => postJson<MutationResult>(`/analysis-jobs/${id}/cancel`, {}),
+  retryAnalysisJob: (id: number) => postJson<MutationResult>(`/analysis-jobs/${id}/retry`, {}),
 };

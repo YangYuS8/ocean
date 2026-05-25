@@ -4,11 +4,45 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 use Tests\TestCase;
 
 class AnalysisJobLifecycleTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Redis::spy();
+    }
+
+    public function test_creating_analysis_job_enqueues_worker_payload_in_redis(): void
+    {
+        $sampleId = $this->createSample();
+
+        $response = $this->postJson('/api/analysis-jobs', [
+            'sample_id' => $sampleId,
+            'job_type' => 'quality_assessment',
+            'queued_by' => $this->createUser('analyst-queue'),
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.status', 'queued');
+
+        $jobId = $response->json('data.id');
+
+        Redis::shouldHaveReceived('rpush')->once()->withArgs(function (string $queue, string $payload) use ($jobId, $sampleId) {
+            $decoded = json_decode($payload, true);
+
+            return $queue === 'ocean:analysis-jobs:queued'
+                && $decoded['id'] === $jobId
+                && $decoded['sample_id'] === $sampleId
+                && $decoded['job_type'] === 'quality_assessment'
+                && isset($decoded['queued_at']);
+        });
+    }
 
     public function test_analysis_job_can_start_from_queued(): void
     {
@@ -112,6 +146,15 @@ class AnalysisJobLifecycleTest extends TestCase
             'status' => 'queued',
             'params_json' => json_encode(['window' => '24h']),
         ]);
+
+        Redis::shouldHaveReceived('rpush')->once()->withArgs(function (string $queue, string $payload) use ($newId, $originalJob) {
+            $decoded = json_decode($payload, true);
+
+            return $queue === 'ocean:analysis-jobs:queued'
+                && $decoded['id'] === $newId
+                && $decoded['sample_id'] === (int) $originalJob->sample_id
+                && $decoded['job_type'] === 'quality_assessment';
+        });
     }
 
     public function test_invalid_analysis_job_transition_is_rejected(): void
@@ -128,23 +171,8 @@ class AnalysisJobLifecycleTest extends TestCase
 
     private function createAnalysisJob(array $overrides = []): int
     {
-        $userId = DB::table('users')->insertGetId([
-            'username' => 'analyst01',
-            'display_name' => '分析员01',
-            'email' => 'analyst01@example.com',
-            'status' => 'active',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $sampleId = DB::table('samples')->insertGetId([
-            'sample_code' => 'SP-TEST-001',
-            'sample_type' => 'water',
-            'status' => 'testing',
-            'collector_id' => $userId,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $userId = $this->createUser('analyst01');
+        $sampleId = $this->createSample($userId);
 
         return DB::table('analysis_jobs')->insertGetId(array_merge([
             'sample_id' => $sampleId,
@@ -160,5 +188,31 @@ class AnalysisJobLifecycleTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ], $overrides));
+    }
+
+    private function createUser(string $username): int
+    {
+        return DB::table('users')->insertGetId([
+            'username' => $username,
+            'display_name' => '分析员01',
+            'email' => $username.'@example.com',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createSample(?int $collectorId = null): int
+    {
+        $collectorId ??= $this->createUser('collector01');
+
+        return DB::table('samples')->insertGetId([
+            'sample_code' => 'SP-TEST-'.uniqid(),
+            'sample_type' => 'water',
+            'status' => 'testing',
+            'collector_id' => $collectorId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }

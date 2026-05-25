@@ -152,6 +152,8 @@ queued -> running -> succeeded
 - 重试失败任务不能复活原记录
 - 原 `failed` 记录必须保留在历史中
 - 重试会创建新的 `queued` 记录
+- 每条新的 `queued` 记录都会通过 `ANALYSIS_JOB_REDIS_QUEUE` 配置的 Redis 队列交给 Python Worker
+- Redis 队列项只是交接信号，数据库记录仍是持久状态来源
 
 ## 初始化与迁移原则
 

@@ -28,7 +28,6 @@ composer.phar
 node_modules/
 package-lock.json
 !website/package-lock.json
-!frontend-spa/package-lock.json
 dist/
 .vite/
 *.tsbuildinfo
@@ -57,3 +56,13 @@ tmp/
 .cache/
 website/.docusaurus/
 website/build/
+
+# Laravel Boost generated agent resources
+backend/.agents/
+backend/.claude/
+backend/.codex/
+backend/.mcp.json
+backend/AGENTS.md
+backend/CLAUDE.md
+backend/boost.json
+backend/opencode.json

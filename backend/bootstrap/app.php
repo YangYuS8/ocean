@@ -1,8 +1,14 @@
 <?php
 
+use App\Exceptions\ApiException;
+use App\Http\Middleware\AuthenticateOceanToken;
+use App\Http\Middleware\EnsureOceanPermission;
+use App\Http\Middleware\InjectOceanActor;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,10 +18,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->api(prepend: [
+            InjectOceanActor::class,
+        ]);
+
+        $middleware->alias([
+            'ocean.auth' => AuthenticateOceanToken::class,
+            'ocean.permission' => EnsureOceanPermission::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(function (App\Exceptions\ApiException $exception, Illuminate\Http\Request $request) {
+        $exceptions->render(function (ApiException $exception, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json([
                     'error' => [
@@ -28,7 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
 
-        $exceptions->render(function (Symfony\Component\HttpKernel\Exception\NotFoundHttpException $exception, Illuminate\Http\Request $request) {
+        $exceptions->render(function (NotFoundHttpException $exception, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json([
                     'error' => [

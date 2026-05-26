@@ -22,10 +22,13 @@ class AnalysisJobLifecycleTest extends TestCase
     {
         $sampleId = $this->createSample();
 
-        $response = $this->postJson('/api/analysis-jobs', [
+        $analystId = $this->createUser('analyst-queue', 'analyst');
+        $token = $this->createTokenForUser($analystId);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)->postJson('/api/analysis-jobs', [
             'sample_id' => $sampleId,
             'job_type' => 'quality_assessment',
-            'queued_by' => $this->createUser('analyst-queue'),
+            'queued_by' => $analystId,
         ]);
 
         $response->assertCreated()
@@ -48,7 +51,7 @@ class AnalysisJobLifecycleTest extends TestCase
     {
         $jobId = $this->createAnalysisJob(['status' => 'queued']);
 
-        $response = $this->postJson("/api/analysis-jobs/{$jobId}/start");
+        $response = $this->withWorkerHeader()->postJson("/api/analysis-jobs/{$jobId}/start");
 
         $response->assertOk()
             ->assertJsonPath('data.status', 'running');
@@ -63,7 +66,7 @@ class AnalysisJobLifecycleTest extends TestCase
     {
         $jobId = $this->createAnalysisJob(['status' => 'running', 'started_at' => now()]);
 
-        $response = $this->postJson("/api/analysis-jobs/{$jobId}/succeed", [
+        $response = $this->withWorkerHeader()->postJson("/api/analysis-jobs/{$jobId}/succeed", [
             'result_summary' => '分析完成，未发现明显异常。',
         ]);
 
@@ -82,7 +85,7 @@ class AnalysisJobLifecycleTest extends TestCase
     {
         $jobId = $this->createAnalysisJob(['status' => 'running', 'started_at' => now()]);
 
-        $response = $this->postJson("/api/analysis-jobs/{$jobId}/fail", [
+        $response = $this->withWorkerHeader()->postJson("/api/analysis-jobs/{$jobId}/fail", [
             'error_message' => '分析服务超时',
         ]);
 
@@ -100,8 +103,11 @@ class AnalysisJobLifecycleTest extends TestCase
     public function test_analysis_job_can_be_cancelled_from_queued(): void
     {
         $jobId = $this->createAnalysisJob(['status' => 'queued']);
+        $analystId = $this->createUser('analyst-cancel', 'analyst');
+        $token = $this->createTokenForUser($analystId);
 
-        $response = $this->postJson("/api/analysis-jobs/{$jobId}/cancel");
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/analysis-jobs/{$jobId}/cancel");
 
         $response->assertOk()
             ->assertJsonPath('data.status', 'cancelled');
@@ -121,8 +127,11 @@ class AnalysisJobLifecycleTest extends TestCase
             'finished_at' => now(),
         ]);
         $originalJob = DB::table('analysis_jobs')->where('id', $jobId)->first();
+        $analystId = $this->createUser('analyst-retry', 'analyst');
+        $token = $this->createTokenForUser($analystId);
 
-        $response = $this->postJson("/api/analysis-jobs/{$jobId}/retry");
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/analysis-jobs/{$jobId}/retry");
 
         $response->assertCreated()
             ->assertJsonPath('data.status', 'queued')
@@ -161,7 +170,7 @@ class AnalysisJobLifecycleTest extends TestCase
     {
         $jobId = $this->createAnalysisJob(['status' => 'queued']);
 
-        $response = $this->postJson("/api/analysis-jobs/{$jobId}/succeed", [
+        $response = $this->withWorkerHeader()->postJson("/api/analysis-jobs/{$jobId}/succeed", [
             'result_summary' => '不应直接成功',
         ]);
 
@@ -190,15 +199,54 @@ class AnalysisJobLifecycleTest extends TestCase
         ], $overrides));
     }
 
-    private function createUser(string $username): int
+    private function createUser(string $username, ?string $roleCode = null): int
     {
-        return DB::table('users')->insertGetId([
+        $userId = DB::table('users')->insertGetId([
             'username' => $username,
             'display_name' => '分析员01',
             'email' => $username.'@example.com',
             'status' => 'active',
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+
+        if ($roleCode !== null) {
+            $roleId = DB::table('roles')->insertGetId([
+                'code' => $roleCode.'-'.uniqid(),
+                'name' => ucfirst($roleCode),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            DB::table('roles')->where('id', $roleId)->update(['code' => $roleCode]);
+            DB::table('user_roles')->insert(['user_id' => $userId, 'role_id' => $roleId]);
+        }
+
+        return $userId;
+    }
+
+    private function createTokenForUser(int $userId): string
+    {
+        $plainToken = bin2hex(random_bytes(32));
+
+        DB::table('api_tokens')->insert([
+            'user_id' => $userId,
+            'name' => 'test',
+            'token_hash' => hash('sha256', $plainToken),
+            'expires_at' => now()->addHour(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $plainToken;
+    }
+
+    private function withWorkerHeader(): static
+    {
+        $workerId = $this->createUser('worker01', 'worker');
+
+        return $this->withHeaders([
+            'Authorization' => '',
+            'X-Ocean-Worker' => 'ocean-python-worker',
         ]);
     }
 

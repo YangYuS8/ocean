@@ -16,9 +16,10 @@ class SampleImageSuggestionTest extends TestCase
     {
         Storage::fake('public');
 
-        [$sampleId] = $this->createSample();
+        [$sampleId, $userId] = $this->createSample();
+        $token = $this->createTokenForUser($userId);
 
-        $uploadResponse = $this->post("/api/samples/{$sampleId}/main-image", [
+        $uploadResponse = $this->withHeader('Authorization', 'Bearer '.$token)->post("/api/samples/{$sampleId}/main-image", [
             'image' => UploadedFile::fake()->create('main-image.jpg', 120, 'image/jpeg'),
         ], [
             'Accept' => 'application/json',
@@ -37,7 +38,7 @@ class SampleImageSuggestionTest extends TestCase
         $sample = DB::table('samples')->where('id', $sampleId)->first();
 
         $this->assertNotNull($sample->main_image_path);
-        Storage::disk('public')->assertExists($sample->main_image_path);
+        $this->assertTrue(Storage::disk('public')->exists((string) $sample->main_image_path));
     }
 
     public function test_object_detection_job_uses_current_main_image_params(): void
@@ -45,14 +46,15 @@ class SampleImageSuggestionTest extends TestCase
         Storage::fake('public');
 
         [$sampleId, $userId] = $this->createSample();
+        $token = $this->createTokenForUser($userId);
 
-        $this->post("/api/samples/{$sampleId}/main-image", [
+        $this->withHeader('Authorization', 'Bearer '.$token)->post("/api/samples/{$sampleId}/main-image", [
             'image' => UploadedFile::fake()->create('detector.jpg', 120, 'image/jpeg'),
         ], [
             'Accept' => 'application/json',
         ])->assertCreated();
 
-        $response = $this->postJson('/api/analysis-jobs', [
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)->postJson('/api/analysis-jobs', [
             'sample_id' => $sampleId,
             'job_type' => 'object_detection',
             'queued_by' => $userId,
@@ -75,20 +77,21 @@ class SampleImageSuggestionTest extends TestCase
         Storage::fake('public');
 
         [$sampleId, $userId] = $this->createSample();
+        $token = $this->createTokenForUser($userId);
 
-        $this->post("/api/samples/{$sampleId}/main-image", [
+        $this->withHeader('Authorization', 'Bearer '.$token)->post("/api/samples/{$sampleId}/main-image", [
             'image' => UploadedFile::fake()->create('detector.jpg', 120, 'image/jpeg'),
         ], [
             'Accept' => 'application/json',
         ])->assertCreated();
 
-        $this->postJson('/api/analysis-jobs', [
+        $this->withHeader('Authorization', 'Bearer '.$token)->postJson('/api/analysis-jobs', [
             'sample_id' => $sampleId,
             'job_type' => 'object_detection',
             'queued_by' => $userId,
         ])->assertCreated();
 
-        $response = $this->postJson('/api/analysis-jobs', [
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)->postJson('/api/analysis-jobs', [
             'sample_id' => $sampleId,
             'job_type' => 'object_detection',
             'queued_by' => $userId,
@@ -103,14 +106,15 @@ class SampleImageSuggestionTest extends TestCase
         Storage::fake('public');
 
         [$sampleId, $userId] = $this->createSample();
+        $token = $this->createTokenForUser($userId);
 
-        $this->post("/api/samples/{$sampleId}/main-image", [
+        $this->withHeader('Authorization', 'Bearer '.$token)->post("/api/samples/{$sampleId}/main-image", [
             'image' => UploadedFile::fake()->create('first.jpg', 120, 'image/jpeg'),
         ], [
             'Accept' => 'application/json',
         ])->assertCreated();
 
-        $createJobResponse = $this->postJson('/api/analysis-jobs', [
+        $createJobResponse = $this->withHeader('Authorization', 'Bearer '.$token)->postJson('/api/analysis-jobs', [
             'sample_id' => $sampleId,
             'job_type' => 'object_detection',
             'queued_by' => $userId,
@@ -118,8 +122,8 @@ class SampleImageSuggestionTest extends TestCase
 
         $jobId = $createJobResponse->json('data.id');
 
-        $this->postJson("/api/analysis-jobs/{$jobId}/start")->assertOk();
-        $this->postJson("/api/analysis-jobs/{$jobId}/succeed", [
+        $this->withWorkerHeader()->postJson("/api/analysis-jobs/{$jobId}/start")->assertOk();
+        $this->withWorkerHeader()->postJson("/api/analysis-jobs/{$jobId}/succeed", [
             'result_summary' => '检测到 scallop x2, starfish x1',
             'suggestion' => [
                 'has_findings' => true,
@@ -140,7 +144,7 @@ class SampleImageSuggestionTest extends TestCase
             ->assertJsonPath('data.suggestion.has_findings', true)
             ->assertJsonPath('data.suggestion.counts.scallop', 2);
 
-        $this->post("/api/samples/{$sampleId}/main-image", [
+        $this->withHeader('Authorization', 'Bearer '.$token)->post("/api/samples/{$sampleId}/main-image", [
             'image' => UploadedFile::fake()->create('second.jpg', 120, 'image/jpeg'),
         ], [
             'Accept' => 'application/json',
@@ -157,21 +161,22 @@ class SampleImageSuggestionTest extends TestCase
         Storage::fake('public');
 
         [$sampleId, $userId] = $this->createSample();
+        $token = $this->createTokenForUser($userId);
 
-        $this->post("/api/samples/{$sampleId}/main-image", [
+        $this->withHeader('Authorization', 'Bearer '.$token)->post("/api/samples/{$sampleId}/main-image", [
             'image' => UploadedFile::fake()->create('refresh.jpg', 120, 'image/jpeg'),
         ], [
             'Accept' => 'application/json',
         ])->assertCreated();
 
-        $firstJobId = $this->postJson('/api/analysis-jobs', [
+        $firstJobId = $this->withHeader('Authorization', 'Bearer '.$token)->postJson('/api/analysis-jobs', [
             'sample_id' => $sampleId,
             'job_type' => 'object_detection',
             'queued_by' => $userId,
         ])->json('data.id');
 
-        $this->postJson("/api/analysis-jobs/{$firstJobId}/start")->assertOk();
-        $this->postJson("/api/analysis-jobs/{$firstJobId}/succeed", [
+        $this->withWorkerHeader()->postJson("/api/analysis-jobs/{$firstJobId}/start")->assertOk();
+        $this->withWorkerHeader()->postJson("/api/analysis-jobs/{$firstJobId}/succeed", [
             'result_summary' => '检测到 scallop x1',
             'suggestion' => [
                 'has_findings' => true,
@@ -179,7 +184,7 @@ class SampleImageSuggestionTest extends TestCase
             ],
         ])->assertOk();
 
-        $this->postJson('/api/analysis-jobs', [
+        $this->withHeader('Authorization', 'Bearer '.$token)->postJson('/api/analysis-jobs', [
             'sample_id' => $sampleId,
             'job_type' => 'object_detection',
             'queued_by' => $userId,
@@ -204,6 +209,18 @@ class SampleImageSuggestionTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        foreach (['analyst' => 'Analyst', 'inspector' => 'Inspector'] as $roleCode => $roleName) {
+            DB::table('roles')->updateOrInsert(['code' => $roleCode], [
+                'name' => $roleName,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            DB::table('user_roles')->updateOrInsert([
+                'user_id' => $userId,
+                'role_id' => DB::table('roles')->where('code', $roleCode)->value('id'),
+            ], []);
+        }
+
         $sampleId = DB::table('samples')->insertGetId([
             'sample_code' => 'SP-IMG-001',
             'sample_type' => 'benthic',
@@ -214,5 +231,46 @@ class SampleImageSuggestionTest extends TestCase
         ]);
 
         return [$sampleId, $userId];
+    }
+
+    private function withWorkerHeader(): static
+    {
+        DB::table('users')->updateOrInsert(['username' => 'worker01'], [
+            'display_name' => 'Worker 01',
+            'email' => 'worker01@example.com',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('roles')->updateOrInsert(['code' => 'worker'], [
+            'name' => 'Worker',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('user_roles')->updateOrInsert([
+            'user_id' => DB::table('users')->where('username', 'worker01')->value('id'),
+            'role_id' => DB::table('roles')->where('code', 'worker')->value('id'),
+        ], []);
+
+        return $this->withHeaders([
+            'Authorization' => '',
+            'X-Ocean-Worker' => 'ocean-python-worker',
+        ]);
+    }
+
+    private function createTokenForUser(int $userId): string
+    {
+        $plainToken = bin2hex(random_bytes(32));
+
+        DB::table('api_tokens')->insert([
+            'user_id' => $userId,
+            'name' => 'test',
+            'token_hash' => hash('sha256', $plainToken),
+            'expires_at' => now()->addHour(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $plainToken;
     }
 }

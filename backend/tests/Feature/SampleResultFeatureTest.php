@@ -48,8 +48,9 @@ class SampleResultFeatureTest extends TestCase
     public function test_creating_sample_result_advances_registered_sample_to_testing(): void
     {
         [$sampleId, $userId] = $this->createSample(['status' => 'registered']);
+        $token = $this->createTokenForUser($userId);
 
-        $response = $this->postJson("/api/samples/{$sampleId}/results", [
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)->postJson("/api/samples/{$sampleId}/results", [
             'result_type' => 'salinity',
             'raw_value' => ['value' => 31.2, 'unit' => 'ppt'],
             'entered_by' => $userId,
@@ -67,8 +68,9 @@ class SampleResultFeatureTest extends TestCase
     public function test_creating_sample_result_for_invalid_sample_returns_conflict(): void
     {
         [$sampleId, $userId] = $this->createSample(['status' => 'invalid']);
+        $token = $this->createTokenForUser($userId);
 
-        $response = $this->postJson("/api/samples/{$sampleId}/results", [
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)->postJson("/api/samples/{$sampleId}/results", [
             'result_type' => 'salinity',
             'raw_value' => ['value' => 31.2, 'unit' => 'ppt'],
             'entered_by' => $userId,
@@ -130,6 +132,15 @@ class SampleResultFeatureTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $roleId = DB::table('roles')->insertGetId([
+            'code' => 'analyst-'.uniqid(),
+            'name' => 'Analyst',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('roles')->where('id', $roleId)->update(['code' => 'analyst']);
+        DB::table('user_roles')->insert(['user_id' => $userId, 'role_id' => $roleId]);
+
         $sampleId = DB::table('samples')->insertGetId(array_merge([
             'sample_code' => 'SP-RESULT-'.uniqid(),
             'sample_type' => 'water',
@@ -140,5 +151,21 @@ class SampleResultFeatureTest extends TestCase
         ], $sampleOverrides));
 
         return [$sampleId, $userId];
+    }
+
+    private function createTokenForUser(int $userId): string
+    {
+        $plainToken = bin2hex(random_bytes(32));
+
+        DB::table('api_tokens')->insert([
+            'user_id' => $userId,
+            'name' => 'test',
+            'token_hash' => hash('sha256', $plainToken),
+            'expires_at' => now()->addHour(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $plainToken;
     }
 }

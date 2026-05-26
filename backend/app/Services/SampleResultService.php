@@ -4,15 +4,18 @@ namespace App\Services;
 
 use App\Exceptions\ApiException;
 use App\Services\Concerns\PaginatesQueries;
+use App\Support\ActorContext;
 use Illuminate\Support\Facades\DB;
 
 class SampleResultService
 {
     use PaginatesQueries;
 
-    public function __construct(private readonly SampleService $sampleService)
-    {
-    }
+    public function __construct(
+        private readonly SampleService $sampleService,
+        private readonly ActorContext $actorContext,
+        private readonly AuditTrailService $auditTrailService
+    ) {}
 
     public function index(int $sampleId, array $query): array
     {
@@ -25,7 +28,7 @@ class SampleResultService
             ->where('sr.sample_id', $sampleId);
 
         foreach (['result_type', 'status'] as $field) {
-            if (!empty($query[$field])) {
+            if (! empty($query[$field])) {
                 $builder->where('sr.'.$field, $query[$field]);
             }
         }
@@ -61,11 +64,13 @@ class SampleResultService
         $sample = $this->sampleService->getStatusSnapshot($sampleId);
         $this->sampleService->assertCanAcceptResult($sample);
 
-        if (!empty($payload['entered_by']) && !DB::table('users')->where('id', (int) $payload['entered_by'])->exists()) {
+        $enteredBy = $this->actorContext->resolveActorId($payload, 'entered_by');
+
+        if ($enteredBy !== null && ! DB::table('users')->where('id', $enteredBy)->exists()) {
             throw new ApiException('NOT_FOUND', 'user not found', 404);
         }
 
-        return DB::transaction(function () use ($sampleId, $payload, $sample) {
+        return DB::transaction(function () use ($sampleId, $payload, $sample, $enteredBy) {
             $id = DB::table('sample_results')->insertGetId([
                 'sample_id' => $sampleId,
                 'result_type' => $payload['result_type'],
@@ -73,7 +78,7 @@ class SampleResultService
                 'raw_value' => array_key_exists('raw_value', $payload) ? json_encode($payload['raw_value'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
                 'normalized_value' => array_key_exists('normalized_value', $payload) ? json_encode($payload['normalized_value'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
                 'conclusion' => $payload['conclusion'] ?? null,
-                'entered_by' => $payload['entered_by'] ?? null,
+                'entered_by' => $enteredBy,
                 'entered_at' => now(),
                 'notes' => $payload['notes'] ?? null,
                 'created_at' => now(),
@@ -81,6 +86,12 @@ class SampleResultService
             ]);
 
             $this->sampleService->advanceToTestingWhenReceivingResult($sample);
+
+            $this->auditTrailService->record('sample_result.created', 'sample_result', $id, $enteredBy, [
+                'sample_id' => $sampleId,
+                'result_type' => $payload['result_type'],
+                'sample_status_before' => $sample->status,
+            ]);
 
             return [
                 'id' => $id,
@@ -93,7 +104,7 @@ class SampleResultService
 
     private function assertSampleExists(int $sampleId): void
     {
-        if (!DB::table('samples')->where('id', $sampleId)->exists()) {
+        if (! DB::table('samples')->where('id', $sampleId)->exists()) {
             throw new ApiException('NOT_FOUND', 'sample not found', 404);
         }
     }

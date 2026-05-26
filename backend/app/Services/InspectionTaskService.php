@@ -4,11 +4,17 @@ namespace App\Services;
 
 use App\Exceptions\ApiException;
 use App\Services\Concerns\PaginatesQueries;
+use App\Support\ActorContext;
 use Illuminate\Support\Facades\DB;
 
 class InspectionTaskService
 {
     use PaginatesQueries;
+
+    public function __construct(
+        private readonly ActorContext $actorContext,
+        private readonly AuditTrailService $auditTrailService
+    ) {}
 
     public function index(array $query): array
     {
@@ -16,22 +22,22 @@ class InspectionTaskService
         $builder = DB::table('inspection_tasks as t')
             ->leftJoin('users as u', 'u.id', '=', 't.assigned_to');
 
-        if (!empty($query['status'])) {
+        if (! empty($query['status'])) {
             $builder->where('t.status', $query['status']);
         }
-        if (!empty($query['assigned_to'])) {
+        if (! empty($query['assigned_to'])) {
             $builder->where('t.assigned_to', (int) $query['assigned_to']);
         }
-        if (!empty($query['task_type'])) {
+        if (! empty($query['task_type'])) {
             $builder->where('t.task_type', $query['task_type']);
         }
-        if (!empty($query['planned_date_from'])) {
+        if (! empty($query['planned_date_from'])) {
             $builder->where('t.planned_at', '>=', $query['planned_date_from'].' 00:00:00');
         }
-        if (!empty($query['planned_date_to'])) {
+        if (! empty($query['planned_date_to'])) {
             $builder->where('t.planned_at', '<=', $query['planned_date_to'].' 23:59:59');
         }
-        if (!empty($query['keyword'])) {
+        if (! empty($query['keyword'])) {
             $keyword = '%'.$query['keyword'].'%';
             $builder->where(function ($q) use ($keyword) {
                 $q->where('t.task_code', 'like', $keyword)
@@ -42,9 +48,9 @@ class InspectionTaskService
 
         $total = (clone $builder)->count();
         $rows = $builder->select([
-                't.id', 't.task_code', 't.title', 't.task_type', 't.priority', 't.status',
-                't.location_text', 't.planned_at', 't.due_at', 'u.id as assigned_to_id', 'u.display_name as assigned_to_name',
-            ])
+            't.id', 't.task_code', 't.title', 't.task_type', 't.priority', 't.status',
+            't.location_text', 't.planned_at', 't.due_at', 'u.id as assigned_to_id', 'u.display_name as assigned_to_name',
+        ])
             ->orderByDesc('t.id')
             ->offset($offset)
             ->limit($pageSize)
@@ -78,7 +84,7 @@ class InspectionTaskService
             ->where('t.id', $id)
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             throw new ApiException('NOT_FOUND', 'inspection task not found', 404);
         }
 
@@ -111,20 +117,28 @@ class InspectionTaskService
     public function start(int $id, array $payload): array
     {
         $task = DB::table('inspection_tasks')->select(['id', 'status'])->where('id', $id)->first();
-        if (!$task) {
+        if (! $task) {
             throw new ApiException('NOT_FOUND', 'inspection task not found', 404);
         }
         if ($task->status !== 'assigned') {
             throw new ApiException('INVALID_STATE', 'inspection task cannot be started from current state', 409);
         }
 
-        $this->assertUserExists((int) $payload['operator_id']);
+        $operatorId = $this->actorContext->resolveActorId($payload, 'operator_id');
+        $this->assertUserExists($operatorId);
 
-        DB::table('inspection_tasks')->where('id', $id)->update([
-            'status' => 'in_progress',
-            'started_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($id, $operatorId, $task) {
+            DB::table('inspection_tasks')->where('id', $id)->update([
+                'status' => 'in_progress',
+                'started_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->auditTrailService->record('inspection_task.started', 'inspection_task', $id, $operatorId, [
+                'from_status' => $task->status,
+                'to_status' => 'in_progress',
+            ]);
+        });
 
         return [
             'id' => $id,
@@ -136,20 +150,29 @@ class InspectionTaskService
     public function submit(int $id, array $payload): array
     {
         $task = DB::table('inspection_tasks')->select(['id', 'status'])->where('id', $id)->first();
-        if (!$task) {
+        if (! $task) {
             throw new ApiException('NOT_FOUND', 'inspection task not found', 404);
         }
         if ($task->status !== 'in_progress') {
             throw new ApiException('INVALID_STATE', 'inspection task cannot be submitted from current state', 409);
         }
 
-        $this->assertUserExists((int) $payload['operator_id']);
+        $operatorId = $this->actorContext->resolveActorId($payload, 'operator_id');
+        $this->assertUserExists($operatorId);
 
-        DB::table('inspection_tasks')->where('id', $id)->update([
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($id, $operatorId, $task, $payload) {
+            DB::table('inspection_tasks')->where('id', $id)->update([
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->auditTrailService->record('inspection_task.submitted', 'inspection_task', $id, $operatorId, [
+                'from_status' => $task->status,
+                'to_status' => 'submitted',
+                'has_submission_note' => ! empty($payload['submission_note'] ?? null),
+            ]);
+        });
 
         return [
             'id' => $id,
@@ -158,9 +181,9 @@ class InspectionTaskService
         ];
     }
 
-    private function assertUserExists(int $userId): void
+    private function assertUserExists(?int $userId): void
     {
-        if (!DB::table('users')->where('id', $userId)->exists()) {
+        if ($userId === null || ! DB::table('users')->where('id', $userId)->exists()) {
             throw new ApiException('NOT_FOUND', 'user not found', 404);
         }
     }

@@ -4,11 +4,17 @@ namespace App\Services;
 
 use App\Exceptions\ApiException;
 use App\Services\Concerns\PaginatesQueries;
+use App\Support\ActorContext;
 use Illuminate\Support\Facades\DB;
 
 class ExceptionService
 {
     use PaginatesQueries;
+
+    public function __construct(
+        private readonly ActorContext $actorContext,
+        private readonly AuditTrailService $auditTrailService
+    ) {}
 
     public function index(array $query): array
     {
@@ -18,19 +24,19 @@ class ExceptionService
             ->leftJoin('users as xu', 'xu.id', '=', 'e.resolved_by');
 
         foreach (['resource_type', 'category', 'severity', 'status'] as $field) {
-            if (!empty($query[$field])) {
+            if (! empty($query[$field])) {
                 $builder->where('e.'.$field, $query[$field]);
             }
         }
         foreach (['resource_id', 'reported_by'] as $field) {
-            if (!empty($query[$field])) {
+            if (! empty($query[$field])) {
                 $builder->where('e.'.$field, (int) $query[$field]);
             }
         }
-        if (!empty($query['created_from'])) {
+        if (! empty($query['created_from'])) {
             $builder->where('e.created_at', '>=', $query['created_from'].' 00:00:00');
         }
-        if (!empty($query['created_to'])) {
+        if (! empty($query['created_to'])) {
             $builder->where('e.created_at', '<=', $query['created_to'].' 23:59:59');
         }
 
@@ -68,22 +74,34 @@ class ExceptionService
     public function store(array $payload): array
     {
         $this->assertResourceExists($payload['resource_type'], (int) $payload['resource_id']);
-        if (!empty($payload['reported_by']) && !DB::table('users')->where('id', (int) $payload['reported_by'])->exists()) {
+        $reportedBy = $this->actorContext->resolveActorId($payload, 'reported_by');
+
+        if ($reportedBy !== null && ! DB::table('users')->where('id', $reportedBy)->exists()) {
             throw new ApiException('NOT_FOUND', 'user not found', 404);
         }
 
-        $id = DB::table('exceptions')->insertGetId([
-            'resource_type' => $payload['resource_type'],
-            'resource_id' => (int) $payload['resource_id'],
-            'category' => $payload['category'],
-            'severity' => $payload['severity'] ?? 'medium',
-            'title' => $payload['title'],
-            'description' => $payload['description'] ?? null,
-            'status' => 'open',
-            'reported_by' => $payload['reported_by'] ?? null,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $id = DB::transaction(function () use ($payload, $reportedBy) {
+            $exceptionId = DB::table('exceptions')->insertGetId([
+                'resource_type' => $payload['resource_type'],
+                'resource_id' => (int) $payload['resource_id'],
+                'category' => $payload['category'],
+                'severity' => $payload['severity'] ?? 'medium',
+                'title' => $payload['title'],
+                'description' => $payload['description'] ?? null,
+                'status' => 'open',
+                'reported_by' => $reportedBy,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->auditTrailService->record('exception.opened', 'exception', $exceptionId, $reportedBy, [
+                'resource_type' => $payload['resource_type'],
+                'resource_id' => (int) $payload['resource_id'],
+                'severity' => $payload['severity'] ?? 'medium',
+            ]);
+
+            return $exceptionId;
+        });
 
         return [
             'id' => $id,
@@ -95,22 +113,32 @@ class ExceptionService
     public function resolve(int $id, array $payload): array
     {
         $exception = DB::table('exceptions')->select(['id', 'status'])->where('id', $id)->first();
-        if (!$exception) {
+        if (! $exception) {
             throw new ApiException('NOT_FOUND', 'exception not found', 404);
         }
         if ($exception->status !== 'open') {
             throw new ApiException('INVALID_STATE', 'exception cannot be resolved from current state', 409);
         }
-        if (!DB::table('users')->where('id', (int) $payload['resolved_by'])->exists()) {
+        $resolvedBy = $this->actorContext->resolveActorId($payload, 'resolved_by');
+
+        if ($resolvedBy === null || ! DB::table('users')->where('id', $resolvedBy)->exists()) {
             throw new ApiException('NOT_FOUND', 'user not found', 404);
         }
 
-        DB::table('exceptions')->where('id', $id)->update([
-            'status' => 'resolved',
-            'resolved_by' => (int) $payload['resolved_by'],
-            'resolved_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($id, $resolvedBy, $exception, $payload) {
+            DB::table('exceptions')->where('id', $id)->update([
+                'status' => 'resolved',
+                'resolved_by' => $resolvedBy,
+                'resolved_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->auditTrailService->record('exception.resolved', 'exception', $id, $resolvedBy, [
+                'from_status' => $exception->status,
+                'to_status' => 'resolved',
+                'has_resolve_note' => ! empty($payload['resolve_note'] ?? null),
+            ]);
+        });
 
         return [
             'id' => $id,
@@ -127,11 +155,11 @@ class ExceptionService
             'sample_result' => 'sample_results',
         ];
 
-        if (!isset($tableMap[$resourceType])) {
+        if (! isset($tableMap[$resourceType])) {
             throw new ApiException('VALIDATION_ERROR', 'unsupported resource_type', 422);
         }
 
-        if (!DB::table($tableMap[$resourceType])->where('id', $resourceId)->exists()) {
+        if (! DB::table($tableMap[$resourceType])->where('id', $resourceId)->exists()) {
             throw new ApiException('NOT_FOUND', sprintf('%s not found', $resourceType), 404);
         }
     }

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\ApiException;
 use App\Services\Concerns\PaginatesQueries;
+use App\Support\ActorContext;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
@@ -13,7 +14,13 @@ class AnalysisJobService
     use PaginatesQueries;
 
     private const REDIS_QUEUE_ENV = 'ANALYSIS_JOB_REDIS_QUEUE';
+
     private const DEFAULT_REDIS_QUEUE = 'ocean:analysis-jobs:queued';
+
+    public function __construct(
+        private readonly ActorContext $actorContext,
+        private readonly AuditTrailService $auditTrailService
+    ) {}
 
     public function index(array $query): array
     {
@@ -21,19 +28,19 @@ class AnalysisJobService
         $builder = DB::table('analysis_jobs as aj')->leftJoin('users as u', 'u.id', '=', 'aj.queued_by');
 
         foreach (['job_type', 'status'] as $field) {
-            if (!empty($query[$field])) {
+            if (! empty($query[$field])) {
                 $builder->where('aj.'.$field, $query[$field]);
             }
         }
         foreach (['sample_id', 'queued_by'] as $field) {
-            if (!empty($query[$field])) {
+            if (! empty($query[$field])) {
                 $builder->where('aj.'.$field, (int) $query[$field]);
             }
         }
-        if (!empty($query['queued_from'])) {
+        if (! empty($query['queued_from'])) {
             $builder->where('aj.queued_at', '>=', $query['queued_from'].' 00:00:00');
         }
-        if (!empty($query['queued_to'])) {
+        if (! empty($query['queued_to'])) {
             $builder->where('aj.queued_at', '<=', $query['queued_to'].' 23:59:59');
         }
 
@@ -67,13 +74,15 @@ class AnalysisJobService
     public function store(array $payload): array
     {
         $sample = DB::table('samples')->select(['id', 'status'])->where('id', (int) $payload['sample_id'])->first();
-        if (!$sample) {
+        if (! $sample) {
             throw new ApiException('NOT_FOUND', 'sample not found', 404);
         }
         if (in_array($sample->status, ['invalid', 'archived'], true)) {
             throw new ApiException('INVALID_STATE', 'sample cannot accept analysis jobs in current state', 409);
         }
-        if (!empty($payload['queued_by']) && !DB::table('users')->where('id', (int) $payload['queued_by'])->exists()) {
+        $queuedBy = $this->actorContext->resolveActorId($payload, 'queued_by');
+
+        if ($queuedBy !== null && ! DB::table('users')->where('id', $queuedBy)->exists()) {
             throw new ApiException('NOT_FOUND', 'user not found', 404);
         }
 
@@ -82,16 +91,25 @@ class AnalysisJobService
             $params = $this->buildObjectDetectionParams((int) $payload['sample_id'], $params ?? []);
         }
 
-        $id = DB::table('analysis_jobs')->insertGetId([
-            'sample_id' => (int) $payload['sample_id'],
-            'job_type' => $payload['job_type'],
-            'status' => 'queued',
-            'params_json' => $params === null ? null : json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            'queued_by' => $payload['queued_by'] ?? null,
-            'queued_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $id = DB::transaction(function () use ($payload, $params, $queuedBy) {
+            $jobId = DB::table('analysis_jobs')->insertGetId([
+                'sample_id' => (int) $payload['sample_id'],
+                'job_type' => $payload['job_type'],
+                'status' => 'queued',
+                'params_json' => $params === null ? null : json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'queued_by' => $queuedBy,
+                'queued_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->auditTrailService->record('analysis_job.queued', 'analysis_job', $jobId, $queuedBy, [
+                'sample_id' => (int) $payload['sample_id'],
+                'job_type' => $payload['job_type'],
+            ]);
+
+            return $jobId;
+        });
 
         $this->enqueueForWorker($id, (int) $payload['sample_id'], $payload['job_type']);
 
@@ -134,11 +152,18 @@ class AnalysisJobService
 
         $startedAt = now();
 
-        DB::table('analysis_jobs')->where('id', $id)->update([
-            'status' => 'running',
-            'started_at' => $startedAt,
-            'updated_at' => $startedAt,
-        ]);
+        DB::transaction(function () use ($id, $startedAt, $job) {
+            DB::table('analysis_jobs')->where('id', $id)->update([
+                'status' => 'running',
+                'started_at' => $startedAt,
+                'updated_at' => $startedAt,
+            ]);
+
+            $this->auditTrailService->record('analysis_job.started', 'analysis_job', $id, null, [
+                'from_status' => $job->status,
+                'to_status' => 'running',
+            ]);
+        });
 
         return [
             'id' => $id,
@@ -154,14 +179,21 @@ class AnalysisJobService
 
         $finishedAt = now();
 
-        DB::table('analysis_jobs')->where('id', $id)->update([
-            'status' => 'succeeded',
-            'result_summary' => $payload['result_summary'] ?? null,
-            'suggestion_json' => array_key_exists('suggestion', $payload) ? json_encode($payload['suggestion'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
-            'error_message' => null,
-            'finished_at' => $finishedAt,
-            'updated_at' => $finishedAt,
-        ]);
+        DB::transaction(function () use ($id, $payload, $finishedAt, $job) {
+            DB::table('analysis_jobs')->where('id', $id)->update([
+                'status' => 'succeeded',
+                'result_summary' => $payload['result_summary'] ?? null,
+                'suggestion_json' => array_key_exists('suggestion', $payload) ? json_encode($payload['suggestion'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+                'error_message' => null,
+                'finished_at' => $finishedAt,
+                'updated_at' => $finishedAt,
+            ]);
+
+            $this->auditTrailService->record('analysis_job.succeeded', 'analysis_job', $id, null, [
+                'from_status' => $job->status,
+                'to_status' => 'succeeded',
+            ]);
+        });
 
         return [
             'id' => $id,
@@ -179,13 +211,21 @@ class AnalysisJobService
 
         $finishedAt = now();
 
-        DB::table('analysis_jobs')->where('id', $id)->update([
-            'status' => 'failed',
-            'error_message' => $payload['error_message'] ?? null,
-            'suggestion_json' => null,
-            'finished_at' => $finishedAt,
-            'updated_at' => $finishedAt,
-        ]);
+        DB::transaction(function () use ($id, $payload, $finishedAt, $job) {
+            DB::table('analysis_jobs')->where('id', $id)->update([
+                'status' => 'failed',
+                'error_message' => $payload['error_message'] ?? null,
+                'suggestion_json' => null,
+                'finished_at' => $finishedAt,
+                'updated_at' => $finishedAt,
+            ]);
+
+            $this->auditTrailService->record('analysis_job.failed', 'analysis_job', $id, null, [
+                'from_status' => $job->status,
+                'to_status' => 'failed',
+                'has_error_message' => ! empty($payload['error_message']),
+            ]);
+        });
 
         return [
             'id' => $id,
@@ -200,10 +240,17 @@ class AnalysisJobService
         $job = $this->findJob($id);
         $this->assertState($job, ['queued'], 'analysis job cannot be cancelled from current state');
 
-        DB::table('analysis_jobs')->where('id', $id)->update([
-            'status' => 'cancelled',
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($id, $job) {
+            DB::table('analysis_jobs')->where('id', $id)->update([
+                'status' => 'cancelled',
+                'updated_at' => now(),
+            ]);
+
+            $this->auditTrailService->record('analysis_job.cancelled', 'analysis_job', $id, null, [
+                'from_status' => $job->status,
+                'to_status' => 'cancelled',
+            ]);
+        });
 
         return [
             'id' => $id,
@@ -218,7 +265,7 @@ class AnalysisJobService
             ->where('id', $id)
             ->first();
 
-        if (!$job) {
+        if (! $job) {
             throw new ApiException('NOT_FOUND', 'analysis job not found', 404);
         }
 
@@ -227,23 +274,33 @@ class AnalysisJobService
         }
 
         $sample = DB::table('samples')->select(['id', 'status'])->where('id', (int) $job->sample_id)->first();
-        if (!$sample) {
+        if (! $sample) {
             throw new ApiException('NOT_FOUND', 'sample not found', 404);
         }
         if (in_array($sample->status, ['invalid', 'archived'], true)) {
             throw new ApiException('INVALID_STATE', 'sample cannot accept analysis jobs in current state', 409);
         }
 
-        $newId = DB::table('analysis_jobs')->insertGetId([
-            'sample_id' => (int) $job->sample_id,
-            'job_type' => $job->job_type,
-            'status' => 'queued',
-            'params_json' => $job->params_json,
-            'queued_by' => $job->queued_by,
-            'queued_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $newId = DB::transaction(function () use ($job, $id) {
+            $newJobId = DB::table('analysis_jobs')->insertGetId([
+                'sample_id' => (int) $job->sample_id,
+                'job_type' => $job->job_type,
+                'status' => 'queued',
+                'params_json' => $job->params_json,
+                'queued_by' => $job->queued_by,
+                'queued_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->auditTrailService->record('analysis_job.retried', 'analysis_job', $newJobId, null, [
+                'source_job_id' => $id,
+                'sample_id' => (int) $job->sample_id,
+                'job_type' => $job->job_type,
+            ]);
+
+            return $newJobId;
+        });
 
         $this->enqueueForWorker($newId, (int) $job->sample_id, $job->job_type);
 
@@ -264,7 +321,7 @@ class AnalysisJobService
             ->where('aj.id', $id)
             ->first();
 
-        if (!$job) {
+        if (! $job) {
             throw new ApiException('NOT_FOUND', 'analysis job not found', 404);
         }
 
@@ -273,7 +330,7 @@ class AnalysisJobService
 
     private function assertState(object $job, array $allowedStates, string $message): void
     {
-        if (!in_array($job->status, $allowedStates, true)) {
+        if (! in_array($job->status, $allowedStates, true)) {
             throw new ApiException('INVALID_STATE', $message, 409);
         }
     }
@@ -288,11 +345,11 @@ class AnalysisJobService
             'main_image_version',
         ])->where('id', $sampleId)->first();
 
-        if (!$sample) {
+        if (! $sample) {
             throw new ApiException('NOT_FOUND', 'sample not found', 404);
         }
 
-        if (!$sample->main_image_path) {
+        if (! $sample->main_image_path) {
             throw new ApiException('INVALID_STATE', 'sample main image is required for object detection', 409);
         }
 

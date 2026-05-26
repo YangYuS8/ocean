@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\ApiException;
 use App\Services\Concerns\PaginatesQueries;
+use App\Support\ActorContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -14,25 +15,30 @@ class SampleService
 {
     use PaginatesQueries;
 
+    public function __construct(
+        private readonly ActorContext $actorContext,
+        private readonly AuditTrailService $auditTrailService
+    ) {}
+
     public function index(array $query): array
     {
         [$page, $pageSize, $offset] = $this->pagination($query);
         $builder = DB::table('samples as s')->leftJoin('users as u', 'u.id', '=', 's.collector_id');
 
         foreach (['sample_code', 'sample_type', 'status'] as $field) {
-            if (!empty($query[$field])) {
+            if (! empty($query[$field])) {
                 $builder->where('s.'.$field, $query[$field]);
             }
         }
         foreach (['inspection_task_id', 'collector_id'] as $field) {
-            if (!empty($query[$field])) {
+            if (! empty($query[$field])) {
                 $builder->where('s.'.$field, (int) $query[$field]);
             }
         }
-        if (!empty($query['collection_date_from'])) {
+        if (! empty($query['collection_date_from'])) {
             $builder->where('s.collection_time', '>=', $query['collection_date_from'].' 00:00:00');
         }
-        if (!empty($query['collection_date_to'])) {
+        if (! empty($query['collection_date_to'])) {
             $builder->where('s.collection_time', '<=', $query['collection_date_to'].' 23:59:59');
         }
 
@@ -66,27 +72,38 @@ class SampleService
             throw new ApiException('VALIDATION_ERROR', 'sample_code must be unique', 422);
         }
 
-        if (!empty($payload['inspection_task_id']) && !DB::table('inspection_tasks')->where('id', (int) $payload['inspection_task_id'])->exists()) {
+        if (! empty($payload['inspection_task_id']) && ! DB::table('inspection_tasks')->where('id', (int) $payload['inspection_task_id'])->exists()) {
             throw new ApiException('NOT_FOUND', 'inspection task not found', 404);
         }
 
-        if (!empty($payload['collector_id'])) {
-            $this->assertUserExists((int) $payload['collector_id']);
+        $collectorId = $this->actorContext->resolveActorId($payload, 'collector_id');
+
+        if ($collectorId !== null) {
+            $this->assertUserExists($collectorId);
         }
 
-        $id = DB::table('samples')->insertGetId([
-            'sample_code' => $payload['sample_code'],
-            'inspection_task_id' => $payload['inspection_task_id'] ?? null,
-            'sample_type' => $payload['sample_type'],
-            'name' => $payload['name'] ?? null,
-            'status' => 'registered',
-            'collection_time' => $payload['collection_time'] ?? null,
-            'location_text' => $payload['location_text'] ?? null,
-            'collector_id' => $payload['collector_id'] ?? null,
-            'notes' => $payload['notes'] ?? null,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $id = DB::transaction(function () use ($payload, $collectorId) {
+            $sampleId = DB::table('samples')->insertGetId([
+                'sample_code' => $payload['sample_code'],
+                'inspection_task_id' => $payload['inspection_task_id'] ?? null,
+                'sample_type' => $payload['sample_type'],
+                'name' => $payload['name'] ?? null,
+                'status' => 'registered',
+                'collection_time' => $payload['collection_time'] ?? null,
+                'location_text' => $payload['location_text'] ?? null,
+                'collector_id' => $collectorId,
+                'notes' => $payload['notes'] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->auditTrailService->record('sample.created', 'sample', $sampleId, $collectorId, [
+                'sample_code' => $payload['sample_code'],
+                'inspection_task_id' => $payload['inspection_task_id'] ?? null,
+            ]);
+
+            return $sampleId;
+        });
 
         return [
             'id' => $id,
@@ -100,7 +117,7 @@ class SampleService
     {
         $sample = DB::table('samples')->select(['id', 'status'])->where('id', $id)->first();
 
-        if (!$sample) {
+        if (! $sample) {
             throw new ApiException('NOT_FOUND', 'sample not found', 404);
         }
 
@@ -116,7 +133,7 @@ class SampleService
 
     public function advanceToTestingWhenReceivingResult(object $sample): string
     {
-        if (!in_array($sample->status, ['registered', 'received'], true)) {
+        if (! in_array($sample->status, ['registered', 'received'], true)) {
             return $sample->status;
         }
 
@@ -137,7 +154,7 @@ class SampleService
             ->where('s.id', $id)
             ->first();
 
-        if (!$sample) {
+        if (! $sample) {
             throw new ApiException('NOT_FOUND', 'sample not found', 404);
         }
 
@@ -174,15 +191,22 @@ class SampleService
         $version = ((int) ($sample->main_image_version ?? 0)) + 1;
         $uploadedAt = now();
 
-        DB::table('samples')->where('id', $id)->update([
-            'main_image_path' => $path,
-            'main_image_name' => $image->getClientOriginalName(),
-            'main_image_mime_type' => $image->getClientMimeType(),
-            'main_image_size' => $image->getSize(),
-            'main_image_version' => $version,
-            'main_image_uploaded_at' => $uploadedAt,
-            'updated_at' => $uploadedAt,
-        ]);
+        DB::transaction(function () use ($id, $path, $image, $version, $uploadedAt) {
+            DB::table('samples')->where('id', $id)->update([
+                'main_image_path' => $path,
+                'main_image_name' => $image->getClientOriginalName(),
+                'main_image_mime_type' => $image->getClientMimeType(),
+                'main_image_size' => $image->getSize(),
+                'main_image_version' => $version,
+                'main_image_uploaded_at' => $uploadedAt,
+                'updated_at' => $uploadedAt,
+            ]);
+
+            $this->auditTrailService->record('sample.main_image_uploaded', 'sample', $id, null, [
+                'file_name' => $image->getClientOriginalName(),
+                'version' => $version,
+            ]);
+        });
 
         if ($oldPath && $oldPath !== $path && Storage::disk('public')->exists($oldPath)) {
             Storage::disk('public')->delete($oldPath);
@@ -200,11 +224,11 @@ class SampleService
     {
         $sample = $this->findSample($id);
 
-        if (!$sample->main_image_path) {
+        if (! $sample->main_image_path) {
             throw new ApiException('NOT_FOUND', 'main image not found', 404);
         }
 
-        if (!Storage::disk('public')->exists($sample->main_image_path)) {
+        if (! Storage::disk('public')->exists($sample->main_image_path)) {
             throw new ApiException('NOT_FOUND', 'main image content not found', 404);
         }
 
@@ -218,7 +242,7 @@ class SampleService
     {
         $sample = $this->findSample($id);
 
-        if (!$sample->main_image_path) {
+        if (! $sample->main_image_path) {
             return [
                 'state' => 'missing_main_image',
                 'summary' => null,
@@ -281,7 +305,7 @@ class SampleService
     {
         $sample = DB::table('samples')->where('id', $id)->first();
 
-        if (!$sample) {
+        if (! $sample) {
             throw new ApiException('NOT_FOUND', 'sample not found', 404);
         }
 
@@ -290,7 +314,7 @@ class SampleService
 
     private function formatMainImage(object $sample): ?array
     {
-        if (!$sample->main_image_path) {
+        if (! $sample->main_image_path) {
             return null;
         }
 
@@ -340,7 +364,7 @@ class SampleService
 
     private function assertUserExists(int $userId): void
     {
-        if (!DB::table('users')->where('id', $userId)->exists()) {
+        if (! DB::table('users')->where('id', $userId)->exists()) {
             throw new ApiException('NOT_FOUND', 'user not found', 404);
         }
     }

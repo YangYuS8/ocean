@@ -13,10 +13,11 @@ class User extends Authenticatable
         'username',
         'display_name',
         'email',
+        'password',
         'status',
     ];
 
-    protected $hidden = [];
+    protected $hidden = ['password'];
 
     public $timestamps = true;
 }

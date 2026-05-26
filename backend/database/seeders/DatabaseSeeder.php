@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -14,10 +15,12 @@ class DatabaseSeeder extends Seeder
         DB::table('roles')->updateOrInsert(['code' => 'inspector'], ['name' => '巡检员', 'created_at' => now(), 'updated_at' => now()]);
         DB::table('roles')->updateOrInsert(['code' => 'analyst'], ['name' => '分析员', 'created_at' => now(), 'updated_at' => now()]);
         DB::table('roles')->updateOrInsert(['code' => 'admin'], ['name' => '管理员', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('roles')->updateOrInsert(['code' => 'worker'], ['name' => '分析 Worker', 'created_at' => now(), 'updated_at' => now()]);
 
         DB::table('users')->updateOrInsert(['username' => 'admin'], [
             'display_name' => '系统管理员',
             'email' => 'admin@example.com',
+            'password' => Hash::make('password'),
             'status' => 'active',
             'created_at' => now(),
             'updated_at' => now(),
@@ -25,6 +28,7 @@ class DatabaseSeeder extends Seeder
         DB::table('users')->updateOrInsert(['username' => 'inspector01'], [
             'display_name' => '巡检员01',
             'email' => 'inspector01@example.com',
+            'password' => Hash::make('password'),
             'status' => 'active',
             'created_at' => now(),
             'updated_at' => now(),
@@ -32,6 +36,15 @@ class DatabaseSeeder extends Seeder
         DB::table('users')->updateOrInsert(['username' => 'analyst01'], [
             'display_name' => '分析员01',
             'email' => 'analyst01@example.com',
+            'password' => Hash::make('password'),
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('users')->updateOrInsert(['username' => 'worker01'], [
+            'display_name' => '分析 Worker 01',
+            'email' => 'worker01@example.com',
+            'password' => Hash::make('password'),
             'status' => 'active',
             'created_at' => now(),
             'updated_at' => now(),
@@ -40,11 +53,13 @@ class DatabaseSeeder extends Seeder
         $adminId = DB::table('users')->where('username', 'admin')->value('id');
         $inspectorId = DB::table('users')->where('username', 'inspector01')->value('id');
         $analystId = DB::table('users')->where('username', 'analyst01')->value('id');
+        $workerId = DB::table('users')->where('username', 'worker01')->value('id');
 
         $roleMap = [
             $adminId => DB::table('roles')->where('code', 'admin')->value('id'),
             $inspectorId => DB::table('roles')->where('code', 'inspector')->value('id'),
             $analystId => DB::table('roles')->where('code', 'analyst')->value('id'),
+            $workerId => DB::table('roles')->where('code', 'worker')->value('id'),
         ];
 
         foreach ($roleMap as $userId => $roleId) {

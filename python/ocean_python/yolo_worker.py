@@ -112,7 +112,7 @@ class LaravelApiClient:
         self, method: str, path: str, payload: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         data = None
-        headers = {"Accept": "application/json"}
+        headers = {"Accept": "application/json", "X-Ocean-Worker": "ocean-python-worker"}
 
         if payload is not None:
             data = json.dumps(payload).encode("utf-8")

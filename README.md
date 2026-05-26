@@ -19,6 +19,7 @@ Ocean is an internal platform for marine ecological sample management and equipm
 
 - Site source: `website/`
 - Default documentation entry: `website/docs/intro.md`
+- Contributor guide: `CONTRIBUTING.md` and `website/docs/contributing.md`
 - Simplified Chinese docs: `website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/`
 - GitHub Pages workflow: `.github/workflows/docs-pages.yml`
 
@@ -30,6 +31,7 @@ Recommended starting points:
 - `website/docs/api/p0-api.md`
 - `website/docs/data/data-model-and-states.md`
 - `website/docs/operations/deployment.md`
+- `website/docs/contributing.md`
 
 ## Why Nuxt is no longer the recommended long-term mainline
 

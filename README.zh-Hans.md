@@ -20,6 +20,7 @@ Ocean 是一个面向海洋生态样本管理与设备巡检流程的内部平�
 
 - 英文主文档：`website/docs/intro.md`
 - 简体中文文档：`website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/intro.md`
+- 贡献者指南：`CONTRIBUTING.md` 与 `website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/contributing.md`
 - 文档站源码：`website/`
 - GitHub Pages 工作流：`.github/workflows/docs-pages.yml`
 
@@ -33,6 +34,7 @@ Ocean 是一个面向海洋生态样本管理与设备巡检流程的内部平�
 - `website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/data/data-model-and-states.md`
 - `website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/operations/deployment.md`
 - `website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/product/v1-roadmap.md`
+- `website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/contributing.md`
 
 ## 为什么 Nuxt 不再作为长期主线
 

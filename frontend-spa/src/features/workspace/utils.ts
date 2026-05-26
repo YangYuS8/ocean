@@ -32,6 +32,10 @@ export function formatDate(value: string | null | undefined, language: string): 
 
 export function formatError(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
+    if (error.status === 403 || error.code === 'FORBIDDEN') {
+      return fallback;
+    }
+
     return error.code ? `${error.code}: ${error.message}` : error.message;
   }
 

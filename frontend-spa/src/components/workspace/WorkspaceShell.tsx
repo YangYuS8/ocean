@@ -1,9 +1,32 @@
-import type { ReactNode } from 'react';
-import { Badge, Box, Button, Card, Container, Divider, Grid, Group, Paper, SimpleGrid, Stack, Tabs, Text, TextInput, Title } from '@mantine/core';
+import type { FormEvent, ReactNode } from 'react';
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  Container,
+  Divider,
+  Grid,
+  Group,
+  Paper,
+  PasswordInput,
+  Select,
+  SimpleGrid,
+  Stack,
+  Tabs,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import type { SupportedLanguage } from '../../i18n';
 import type { WorkspaceTab } from '../../features/workspace/types';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { MetricCard } from './MetricCard';
+
+type ActorOption = {
+  value: string;
+  label: string;
+};
 
 type WorkspaceShellProps = {
   title: string;
@@ -12,17 +35,38 @@ type WorkspaceShellProps = {
   apiBaseLabel: string;
   apiBaseValue: string;
   settingsTitle: string;
-  operatorIdLabel: string;
-  analystIdLabel: string;
+  currentActorLabel: string;
+  governedIdentityLabel: string;
+  governanceHint: string;
+  actorRoleLabel: string;
+  headerStrategyLabel: string;
+  authTokenStrategyLabel: string;
   refreshLabel: string;
   languageLabel: string;
   chineseLabel: string;
   englishLabel: string;
   language: SupportedLanguage;
-  operatorId: number;
-  analystId: number;
-  onOperatorIdChange: (value: number) => void;
-  onAnalystIdChange: (value: number) => void;
+  isAuthenticated: boolean;
+  currentActorName: string;
+  currentActorUsername: string;
+  currentActorRole: string;
+  loginTitle: string;
+  usernameLabel: string;
+  passwordLabel: string;
+  loginLabel: string;
+  logoutLabel: string;
+  signedInAsLabel: string;
+  demoAccountsLabel: string;
+  loginUsername: string;
+  loginPassword: string;
+  selectedActorId: number;
+  selectedActorRole: string;
+  actorOptions: ActorOption[];
+  onLoginUsernameChange: (value: string) => void;
+  onLoginPasswordChange: (value: string) => void;
+  onLogin: (event: FormEvent<HTMLFormElement>) => void;
+  onLogout: () => void;
+  onActorChange: (value: number) => void;
   onRefresh: () => void;
   onLanguageChange: (value: SupportedLanguage) => void;
   activeTab: WorkspaceTab;
@@ -44,17 +88,38 @@ export function WorkspaceShell({
   apiBaseLabel,
   apiBaseValue,
   settingsTitle,
-  operatorIdLabel,
-  analystIdLabel,
+  currentActorLabel,
+  governedIdentityLabel,
+  governanceHint,
+  actorRoleLabel,
+  headerStrategyLabel,
+  authTokenStrategyLabel,
   refreshLabel,
   languageLabel,
   chineseLabel,
   englishLabel,
   language,
-  operatorId,
-  analystId,
-  onOperatorIdChange,
-  onAnalystIdChange,
+  isAuthenticated,
+  currentActorName,
+  currentActorUsername,
+  currentActorRole,
+  loginTitle,
+  usernameLabel,
+  passwordLabel,
+  loginLabel,
+  logoutLabel,
+  signedInAsLabel,
+  demoAccountsLabel,
+  loginUsername,
+  loginPassword,
+  selectedActorId,
+  selectedActorRole,
+  actorOptions,
+  onLoginUsernameChange,
+  onLoginPasswordChange,
+  onLogin,
+  onLogout,
+  onActorChange,
   onRefresh,
   onLanguageChange,
   activeTab,
@@ -121,30 +186,88 @@ export function WorkspaceShell({
                         <Text fw={700} c="slate.9">
                           {settingsTitle}
                         </Text>
-                        <Badge variant="outline" color="gray" radius="sm">
-                          Live
+                        <Badge variant="outline" color="ocean" radius="sm">
+                          {governedIdentityLabel}
                         </Badge>
                       </Group>
                       <Divider />
+                      {isAuthenticated ? (
+                        <Paper withBorder radius="md" p="sm" bg="white">
+                          <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                            {signedInAsLabel}
+                          </Text>
+                          <Text fw={700} c="slate.9" mt={4}>
+                            {currentActorName}
+                          </Text>
+                          <Text size="sm" c="slate.7" mt={2}>
+                            @{currentActorUsername}
+                          </Text>
+                        </Paper>
+                      ) : (
+                        <Box component="form" onSubmit={onLogin}>
+                          <Stack gap="sm">
+                          <Text fw={600} c="slate.9">
+                            {loginTitle}
+                          </Text>
+                          <TextInput
+                            label={usernameLabel}
+                            value={loginUsername}
+                            onChange={(event) => onLoginUsernameChange(event.currentTarget.value)}
+                            autoComplete="username"
+                          />
+                          <PasswordInput
+                            label={passwordLabel}
+                            value={loginPassword}
+                            onChange={(event) => onLoginPasswordChange(event.currentTarget.value)}
+                            autoComplete="current-password"
+                          />
+                          <Text size="sm" c="dimmed">
+                            {demoAccountsLabel}
+                          </Text>
+                          {actorOptions.length > 0 ? (
+                            <Select
+                              label={currentActorLabel}
+                              description={governanceHint}
+                              data={actorOptions}
+                              value={String(selectedActorId)}
+                              onChange={(value) => value && onActorChange(Number(value))}
+                              allowDeselect={false}
+                            />
+                          ) : null}
+                          <Button type="submit" color="ocean">
+                            {loginLabel}
+                          </Button>
+                          </Stack>
+                        </Box>
+                      )}
                       <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="sm">
-                        <TextInput
-                          label={operatorIdLabel}
-                          min="1"
-                          type="number"
-                          value={operatorId}
-                          onChange={(event) => onOperatorIdChange(Number(event.currentTarget.value))}
-                        />
-                        <TextInput
-                          label={analystIdLabel}
-                          min="1"
-                          type="number"
-                          value={analystId}
-                          onChange={(event) => onAnalystIdChange(Number(event.currentTarget.value))}
-                        />
+                        <Paper withBorder radius="md" p="sm" bg="white">
+                          <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                            {actorRoleLabel}
+                          </Text>
+                          <Text fw={600} c="slate.9" mt={4}>
+                            {isAuthenticated ? currentActorRole : selectedActorRole}
+                          </Text>
+                        </Paper>
+                        <Paper withBorder radius="md" p="sm" bg="white">
+                          <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                            {headerStrategyLabel}
+                          </Text>
+                          <Text size="sm" c="slate.7" mt={4}>
+                            {authTokenStrategyLabel}
+                          </Text>
+                        </Paper>
                       </SimpleGrid>
-                      <Button variant="light" color="ocean" onClick={onRefresh}>
-                        {refreshLabel}
-                      </Button>
+                      <Group grow>
+                        <Button variant="light" color="ocean" onClick={onRefresh}>
+                          {refreshLabel}
+                        </Button>
+                        {isAuthenticated ? (
+                          <Button variant="outline" color="red" onClick={onLogout}>
+                            {logoutLabel}
+                          </Button>
+                        ) : null}
+                      </Group>
                     </Stack>
                   </Card>
                 </Grid.Col>

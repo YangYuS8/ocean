@@ -30,17 +30,41 @@ function App() {
       apiBaseLabel={t('app.apiBase')}
       apiBaseValue={apiBase}
       settingsTitle={t('app.liveData')}
-      operatorIdLabel={t('app.operatorId')}
-      analystIdLabel={t('app.analystId')}
+      currentActorLabel={t('app.currentActor')}
+      governedIdentityLabel={t('app.governedIdentity')}
+      governanceHint={t('app.rbacHeaderStrategy')}
+      actorRoleLabel={t('app.actorRole')}
+      headerStrategyLabel={t('app.headerStrategy')}
+      authTokenStrategyLabel={t('app.authTokenStrategy')}
       refreshLabel={t('app.refresh')}
       languageLabel={t('app.languageToggle')}
       chineseLabel={t('app.chinese')}
       englishLabel={t('app.english')}
       language={language}
-      operatorId={workspace.operatorId}
-      analystId={workspace.analystId}
-      onOperatorIdChange={workspace.setOperatorId}
-      onAnalystIdChange={workspace.setAnalystId}
+      isAuthenticated={workspace.isAuthenticated}
+      currentActorName={workspace.currentActor?.display_name ?? workspace.currentActor?.username ?? '-'}
+      currentActorUsername={workspace.currentActor?.username ?? '-'}
+      currentActorRole={workspace.currentActor?.roles.join(', ') ?? '-'}
+      loginTitle={t('auth.loginTitle')}
+      usernameLabel={t('auth.username')}
+      passwordLabel={t('auth.password')}
+      loginLabel={t('auth.login')}
+      logoutLabel={t('auth.logout')}
+      signedInAsLabel={t('auth.signedInAs')}
+      demoAccountsLabel={t('auth.demoAccounts')}
+      loginUsername={workspace.loginForm.username}
+      loginPassword={workspace.loginForm.password}
+      selectedActorId={workspace.selectedActorId}
+      selectedActorRole={workspace.effectiveActor.roles.join(', ')}
+      actorOptions={workspace.actorOptions.map((actor) => ({
+        value: String(actor.id),
+        label: `${actor.display_name ?? actor.username} · ${actor.roles.join(', ')}`,
+      }))}
+      onLoginUsernameChange={(value) => workspace.setLoginForm((current) => ({ ...current, username: value }))}
+      onLoginPasswordChange={(value) => workspace.setLoginForm((current) => ({ ...current, password: value }))}
+      onLogin={workspace.handleLogin}
+      onLogout={() => void workspace.handleLogout()}
+      onActorChange={workspace.setSelectedActorId}
       onRefresh={() => void workspace.refreshWorkspace()}
       onLanguageChange={(value) => void i18n.changeLanguage(value)}
       activeTab={activeTab}

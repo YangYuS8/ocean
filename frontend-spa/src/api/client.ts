@@ -1,5 +1,17 @@
 export const apiBase = import.meta.env.VITE_API_BASE?.trim() || '/api';
 
+const AUTHORIZATION_HEADER = 'Authorization';
+
+let apiAuthToken: string | null = null;
+
+export function setApiAuthToken(token: string | null | undefined): void {
+  apiAuthToken = token?.trim() || null;
+}
+
+export function getApiAuthToken(): string | null {
+  return apiAuthToken;
+}
+
 export type ListMeta = {
   page: number;
   page_size: number;
@@ -21,6 +33,49 @@ export type DashboardSummary = {
 export type PersonRef = {
   id: number;
   display_name: string | null;
+};
+
+export type GovernanceRole = {
+  code: string;
+  name: string;
+  permissions: string[];
+};
+
+export type GovernanceActor = {
+  id: number;
+  username: string;
+  display_name: string | null;
+  roles: string[];
+};
+
+export type AuthLoginPayload = {
+  username: string;
+  password: string;
+};
+
+export type AuthLoginResponse = {
+  token: string;
+  actor: GovernanceActor;
+};
+
+export type AuthMeResponse = {
+  actor: GovernanceActor;
+};
+
+export type AuthLogoutResponse = {
+  revoked: true;
+};
+
+export type GovernanceMe = {
+  actor: GovernanceActor | null;
+  identity_strategy: {
+    header: string;
+    fallback: string;
+  };
+};
+
+export type GovernanceRolesResponse = {
+  roles: GovernanceRole[];
 };
 
 export type InspectionTask = {
@@ -175,6 +230,10 @@ export function buildApiUrl(path: string): string {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
 
+  if (apiAuthToken && !headers.has(AUTHORIZATION_HEADER)) {
+    headers.set(AUTHORIZATION_HEADER, `Bearer ${apiAuthToken}`);
+  }
+
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
@@ -198,7 +257,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 async function listRequest<T>(path: string): Promise<ListResponse<T>> {
-  const response = await fetch(buildApiUrl(path));
+  const headers = new Headers();
+
+  if (apiAuthToken) {
+    headers.set(AUTHORIZATION_HEADER, `Bearer ${apiAuthToken}`);
+  }
+
+  const response = await fetch(buildApiUrl(path), { headers });
   const payload = (await response.json().catch(() => null)) as ListResponse<T> & ApiErrorEnvelope | null;
 
   if (!response.ok) {
@@ -223,6 +288,11 @@ function postJson<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const oceanApi = {
+  login: (payload: AuthLoginPayload) => postJson<AuthLoginResponse>('/auth/login', payload),
+  logout: () => postJson<AuthLogoutResponse>('/auth/logout', {}),
+  me: () => request<AuthMeResponse>('/auth/me'),
+  getGovernanceMe: () => request<GovernanceMe>('/governance/me'),
+  getGovernanceRoles: () => request<GovernanceRolesResponse>('/governance/roles'),
   getDashboardSummary: () => request<DashboardSummary>('/dashboard/summary'),
   listInspectionTasks: () => listRequest<InspectionTask>('/inspection-tasks?page_size=20'),
   getInspectionTask: (id: number) => request<InspectionTask>(`/inspection-tasks/${id}`),

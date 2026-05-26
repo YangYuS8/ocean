@@ -39,6 +39,11 @@ export type AnalysisJobForm = {
   job_type: string;
 };
 
+export type LoginForm = {
+  username: string;
+  password: string;
+};
+
 export const emptySummary: DashboardSummary = {
   pending_samples: 0,
   today_inspection_tasks: 0,
@@ -76,4 +81,9 @@ export const initialExceptionForm: ExceptionForm = {
 export const initialAnalysisJobForm: AnalysisJobForm = {
   sample_id: '',
   job_type: 'quality_assessment',
+};
+
+export const initialLoginForm: LoginForm = {
+  username: 'admin',
+  password: 'password',
 };

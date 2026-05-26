@@ -8,7 +8,7 @@ This page consolidates the old data-model draft, state-transition draft, SQL pla
 
 ## Core tables
 
-The P0 phase uses eight core tables:
+The P0/v1.4 baseline uses nine core tables:
 
 - `users`
 - `roles`
@@ -18,6 +18,8 @@ The P0 phase uses eight core tables:
 - `sample_results`
 - `exceptions`
 - `analysis_jobs`
+- `audit_events`
+- `api_tokens`
 
 ## Data relationships
 
@@ -29,9 +31,13 @@ users ----< inspection_tasks ----< samples ----< sample_results
   |                |                    \-> analysis_jobs
   |
   \----< user_roles >---- roles
+
+users ----< audit_events >---- auditable resources
+users ----< api_tokens
 ```
 
 `exceptions` uses `resource_type + resource_id` to reference tasks, samples, or result records.
+`audit_events` also uses `resource_type + resource_id` so it can record events across tasks, samples, results, exceptions, and analysis jobs without coupling the audit log to one table.
 
 ## Database implementation baseline
 
@@ -41,6 +47,17 @@ users ----< inspection_tasks ----< samples ----< sample_results
 - time fields: `DATETIME`
 - state fields: `VARCHAR(20)`
 - JSON fields: used for result content and analysis job parameters / summaries
+
+## Governance baseline
+
+v1.4.0 adds a baseline governance layer without changing the long-term Laravel ownership model:
+
+- `X-Ocean-Actor-Id` is the internal identity injection bridge.
+- SPA login uses database-backed bearer tokens stored in `api_tokens`.
+- `users`, `roles`, and `user_roles` remain the baseline identity/RBAC tables.
+- baseline seeded roles are `admin`, `inspector`, `analyst`, and `worker`.
+- legacy payload identity fields remain accepted only as an attribution compatibility path.
+- `audit_events.actor_source` records whether attribution came from `request_header` or legacy `payload`.
 
 ## State machines
 
@@ -159,5 +176,5 @@ Key retry rule:
 
 - Laravel migration and seeder are the long-term initialization path
 - raw SQL drafts may remain reference material, but not the primary lifecycle path
-- baseline roles should include `inspector`, `analyst`, and `admin`
+- baseline roles should include `inspector`, `analyst`, `admin`, and `worker`
 - baseline seeder should provide one idempotent core-chain example: `inspection_task + sample + sample_result + exception + analysis_job`

@@ -8,7 +8,7 @@ title: 数据模型与状态流转
 
 ## 核心表
 
-P0 阶段使用 8 张核心表：
+P0/v1.4 基线使用 9 张核心表：
 
 - `users`
 - `roles`
@@ -18,6 +18,8 @@ P0 阶段使用 8 张核心表：
 - `sample_results`
 - `exceptions`
 - `analysis_jobs`
+- `audit_events`
+- `api_tokens`
 
 ## 数据关系
 
@@ -29,9 +31,13 @@ users ----< inspection_tasks ----< samples ----< sample_results
   |                |                    \-> analysis_jobs
   |
   \----< user_roles >---- roles
+
+users ----< audit_events >---- auditable resources
+users ----< api_tokens
 ```
 
 `exceptions` 通过 `resource_type + resource_id` 关联任务、样本或结果记录。
+`audit_events` 同样使用 `resource_type + resource_id`，从而在不把审计日志强耦合到单一业务表的情况下记录任务、样本、结果、异常和分析作业事件。
 
 ## 数据库实现基线
 
@@ -41,6 +47,17 @@ users ----< inspection_tasks ----< samples ----< sample_results
 - 时间字段：`DATETIME`
 - 状态字段：`VARCHAR(20)`
 - JSON 字段：用于结果内容和分析任务参数/摘要
+
+## 治理基线
+
+v1.4.0 在不改变 Laravel 长期业务所有权的前提下增加基础治理层：
+
+- `X-Ocean-Actor-Id` 是内部身份注入桥接。
+- SPA 登录使用存储在 `api_tokens` 中的数据库 bearer token。
+- `users`、`roles`、`user_roles` 仍是基础身份 / RBAC 表。
+- baseline seed 角色包括 `admin`、`inspector`、`analyst`、`worker`。
+- 旧 payload 身份字段只作为归因兼容路径继续保留。
+- `audit_events.actor_source` 记录归因来自 `request_header` 还是旧 `payload`。
 
 ## 状态机
 
@@ -159,5 +176,5 @@ queued -> running -> succeeded
 
 - Laravel migration / seeder 是长期初始化主路径
 - 原始 SQL 草案可以保留为参考资料，但不再是主生命周期入口
-- 基础角色至少包括 `inspector`、`analyst` 和 `admin`
+- 基础角色至少包括 `inspector`、`analyst`、`admin` 和 `worker`
 - baseline seeder 需要提供一条幂等的核心链路样例：`inspection_task + sample + sample_result + exception + analysis_job`

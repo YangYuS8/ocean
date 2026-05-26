@@ -185,6 +185,10 @@ v1.3 线路以 MariaDB 中的 `analysis_jobs` 作为持久事实来源，并以 
 - 高价值操作具备定义清晰的审计要求
 - 运维人员拥有稳定的常用运行文档
 
+### v1.4.0 实现说明
+
+v1.4 线路通过 `POST /api/auth/login` 引入 SPA token 登录，为高价值写操作路由增加基础 RBAC 权限控制，并通过 `audit_events` 表记录任务、样本、结果、异常和分析作业动作。旧 payload 身份字段在过渡期仍作为归因兼容保留，但用户发起的受保护写操作需要 `Authorization: Bearer <token>`。`X-Ocean-Actor-Id` 仅作为非 SPA 工具的内部过渡桥接保留，Python Worker 在引入更强 Worker 凭证前使用独立内部桥接。
+
 ## v1.5.0 — 发布加固
 
 ### 目标

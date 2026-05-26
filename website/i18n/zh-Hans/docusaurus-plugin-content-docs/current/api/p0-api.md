@@ -42,6 +42,63 @@ title: P0 API
 
 ## P0 域与接口
 
+### 治理与审计
+
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
+- `GET /api/governance/me`
+- `GET /api/governance/roles`
+- `GET /api/audit-events`
+
+SPA 现在以 token 登录作为主要认证路径：
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "password"
+}
+```
+
+登录成功后返回 bearer token 和 actor 元数据：
+
+```json
+{
+  "data": {
+    "token": "...",
+    "actor": {
+      "id": 1,
+      "username": "admin",
+      "display_name": "系统管理员",
+      "roles": ["admin"]
+    }
+  }
+}
+```
+
+受保护写操作必须发送：
+
+```http
+Authorization: Bearer <token>
+```
+
+`GET /api/auth/me` 返回当前 token actor。`POST /api/auth/logout` 会撤销当前 token。
+
+v1.4.0 的内部身份桥接使用请求头：
+
+```http
+X-Ocean-Actor-Id: 3
+```
+
+当该请求头存在时，Laravel 会解析激活状态的 `users` 记录，把 actor 注入请求上下文，并对敏感写操作应用基础 RBAC。v1.4 过渡期仍接受旧的 payload 身份字段作为兜底，以保证旧 Worker 和前端流程继续可用。
+
+`X-Ocean-Actor-Id` 不再是前端主要认证路径，仅作为非 SPA 工具的内部过渡桥接保留。
+
+`GET /api/governance/roles` 返回基础角色与权限目录。`GET /api/audit-events` 返回分页审计事件，并支持 `event_type`、`resource_type`、`resource_id`、`actor_id`、`actor_source` 等筛选条件。
+
 ### Dashboard
 
 - `GET /api/dashboard/summary`
@@ -120,7 +177,7 @@ v1.0.0 冻结规则：
 
 ### 过渡期身份字段
 
-当前阶段仍允许显式传入：
+v1.4.0 优先使用 token 认证 actor 注入，同时仍允许显式传入以下字段作为兼容兜底：
 
 - `operator_id`
 - `entered_by`
@@ -128,7 +185,49 @@ v1.0.0 冻结规则：
 - `reported_by`
 - `resolved_by`
 
-这些都是过渡策略，后续应迁移到 Laravel 认证态注入。
+如果 token / header actor 身份与旧 payload 字段同时存在，Laravel 使用认证或注入后的 actor。这些字段仍是过渡策略，后续应从用户发起的 API 契约中移除。
+
+### 基础 RBAC 权限
+
+敏感动作必须提供 header actor 或专用内部 worker 桥接：
+
+| 角色 | 权限 |
+| --- | --- |
+| `admin` | 所有权限 |
+| `inspector` | 开始/提交巡检任务、创建样本、上传样本主图、创建异常 |
+| `analyst` | 创建样本结果、创建/解决异常、创建/取消/重试分析作业 |
+| `worker` | 开始/成功/失败分析作业 |
+
+用户发起的敏感写操作必须提供 bearer token。旧 payload 身份字段仍用于 actor 归因兼容，但不能单独授权受保护写路由。
+
+Python Worker 状态回调使用内部 worker 桥接：
+
+```http
+X-Ocean-Worker: ocean-python-worker
+```
+
+该桥接会映射到 seed 中的 `worker01` actor，仅用于内部 Compose / 网络环境，直到后续引入真正的 Worker 凭证。
+
+本地开发的 seed 演示用户为：
+
+| 用户名 | 密码 | 角色 |
+| --- | --- | --- |
+| `admin` | `password` | `admin` |
+| `inspector01` | `password` | `inspector` |
+| `analyst01` | `password` | `analyst` |
+| `worker01` | `password` | `worker` |
+
+### 审计事件预期
+
+Laravel 会为高价值动作记录审计事件，包括：
+
+- 巡检任务开始与提交
+- 样本创建与主图上传
+- 样本结果创建
+- 异常打开与解决
+- 分析作业排队、开始、成功、失败、取消与重试
+
+审计事件包含 `event_type`、`resource_type`、`resource_id`、`actor_id`、`actor_source`、可选 metadata 和 `created_at`。
 
 ## 不应阻塞当前交付的 P1 候选
 

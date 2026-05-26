@@ -81,6 +81,33 @@ ANALYSIS_JOB_REDIS_QUEUE=ocean:analysis-jobs:queued
 
 ## 常用验证命令
 
+### 治理 actor 上下文
+
+```bash
+curl -s -X POST http://127.0.0.1:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"password"}'
+curl -s -H 'X-Ocean-Actor-Id: 3' http://127.0.0.1:8080/api/governance/me
+curl -s http://127.0.0.1:8080/api/governance/roles
+```
+
+在 v1.4.0 中，SPA 通过 `POST /api/auth/login` 登录，并在受保护写路由中发送 `Authorization: Bearer <token>`。`X-Ocean-Actor-Id` 是内部身份注入桥接，不是公开认证机制；它仅在过渡期作为非 SPA 工具的内部路径保留，用户发起的受保护写操作需要 bearer token。
+
+Python Worker 回调在引入真正 Worker 凭证前使用内部桥接请求头：
+
+```bash
+curl -s -H 'X-Ocean-Worker: ocean-python-worker' http://127.0.0.1:8080/api/analysis-jobs
+```
+
+### 审计事件
+
+```bash
+curl -s http://127.0.0.1:8080/api/audit-events?page_size=20
+curl -s 'http://127.0.0.1:8080/api/audit-events?resource_type=analysis_job'
+```
+
+可通过审计事件验证任务开始/提交、样本结果创建、异常解决、分析作业生命周期推进等高价值动作。
+
 ### 首页摘要
 
 ```bash

@@ -81,6 +81,33 @@ If Redis is temporarily unavailable during job creation, the durable database ro
 
 ## Common validation commands
 
+### Governance actor context
+
+```bash
+curl -s -X POST http://127.0.0.1:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"password"}'
+curl -s -H 'X-Ocean-Actor-Id: 3' http://127.0.0.1:8080/api/governance/me
+curl -s http://127.0.0.1:8080/api/governance/roles
+```
+
+For v1.4.0, the SPA authenticates with `POST /api/auth/login` and sends `Authorization: Bearer <token>` for protected mutation routes. `X-Ocean-Actor-Id` is an internal identity-injection bridge, not a public authentication mechanism. It remains available for non-SPA tooling during the transition, but protected user mutation routes require bearer tokens.
+
+Python Worker callbacks use an internal bridge header while the project waits for a real worker credential:
+
+```bash
+curl -s -H 'X-Ocean-Worker: ocean-python-worker' http://127.0.0.1:8080/api/analysis-jobs
+```
+
+### Audit events
+
+```bash
+curl -s http://127.0.0.1:8080/api/audit-events?page_size=20
+curl -s 'http://127.0.0.1:8080/api/audit-events?resource_type=analysis_job'
+```
+
+Use audit events to verify high-value actions such as task start/submit, sample result creation, exception resolution, and analysis job lifecycle transitions.
+
 ### Dashboard summary
 
 ```bash

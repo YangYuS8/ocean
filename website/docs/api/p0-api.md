@@ -42,6 +42,63 @@ This page consolidates the old MVP API scope, field drafts, and OpenSpec require
 
 ## P0 domains and endpoints
 
+### Governance and audit
+
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
+- `GET /api/governance/me`
+- `GET /api/governance/roles`
+- `GET /api/audit-events`
+
+The SPA now uses token login as the primary authentication path:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "password"
+}
+```
+
+Successful login returns a bearer token and actor metadata:
+
+```json
+{
+  "data": {
+    "token": "...",
+    "actor": {
+      "id": 1,
+      "username": "admin",
+      "display_name": "系统管理员",
+      "roles": ["admin"]
+    }
+  }
+}
+```
+
+Protected mutation requests must send:
+
+```http
+Authorization: Bearer <token>
+```
+
+`GET /api/auth/me` returns the current token actor. `POST /api/auth/logout` revokes the current token.
+
+The v1.4.0 internal identity bridge uses the request header:
+
+```http
+X-Ocean-Actor-Id: 3
+```
+
+When present, Laravel resolves the active `users` record, injects the actor into the request context, and applies baseline RBAC to sensitive mutation endpoints. During the v1.4 transition, legacy identity payload fields are still accepted as fallback so older worker and frontend flows continue to operate.
+
+`X-Ocean-Actor-Id` is no longer the primary frontend authentication path. It remains an internal transition bridge for non-SPA tooling only.
+
+`GET /api/governance/roles` returns the baseline role catalog and permissions. `GET /api/audit-events` returns paginated audit events and supports filters such as `event_type`, `resource_type`, `resource_id`, `actor_id`, and `actor_source`.
+
 ### Dashboard
 
 - `GET /api/dashboard/summary`
@@ -120,7 +177,7 @@ New samples start in `registered`.
 
 ### Transitional identity fields
 
-The current phase still allows explicit request fields such as:
+The v1.4.0 phase prefers token-authenticated actor injection and still allows explicit request fields as compatibility fallback:
 
 - `operator_id`
 - `entered_by`
@@ -128,7 +185,49 @@ The current phase still allows explicit request fields such as:
 - `reported_by`
 - `resolved_by`
 
-These are transitional and should later move to authenticated Laravel-side injection.
+If both token/header actor identity and a legacy payload field are present, Laravel uses the authenticated or injected actor. These fields remain transitional and should later be removed from user-initiated API contracts.
+
+### Baseline RBAC permissions
+
+Sensitive actions require either a header actor or the dedicated internal worker bridge:
+
+| Role | Permissions |
+| --- | --- |
+| `admin` | all permissions |
+| `inspector` | start/submit inspection tasks, create samples, upload sample images, create exceptions |
+| `analyst` | create sample results, create/resolve exceptions, create/cancel/retry analysis jobs |
+| `worker` | start/succeed/fail analysis jobs |
+
+Sensitive user-initiated mutation requests require a bearer token. Legacy payload identity fields are preserved for actor attribution compatibility, but they do not authorize protected write routes by themselves.
+
+Python worker status callbacks use the internal worker bridge:
+
+```http
+X-Ocean-Worker: ocean-python-worker
+```
+
+This bridge maps to the seeded `worker01` actor and is only intended for internal Compose/network use until a real worker credential is introduced.
+
+Seeded demo users for local development are:
+
+| Username | Password | Role |
+| --- | --- | --- |
+| `admin` | `password` | `admin` |
+| `inspector01` | `password` | `inspector` |
+| `analyst01` | `password` | `analyst` |
+| `worker01` | `password` | `worker` |
+
+### Audit event expectations
+
+Laravel records audit events for high-value actions including:
+
+- inspection task start and submit
+- sample creation and main-image upload
+- sample result creation
+- exception open and resolve
+- analysis job queue, start, success, failure, cancel, and retry
+
+Audit events include `event_type`, `resource_type`, `resource_id`, `actor_id`, `actor_source`, optional metadata, and `created_at`.
 
 ## P1 candidates that should not block the current delivery line
 

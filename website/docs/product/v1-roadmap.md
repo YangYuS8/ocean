@@ -185,6 +185,10 @@ Add the governance and runtime controls required for a more dependable internal 
 - high-value actions have defined audit expectations
 - operators have stable documentation for common runtime tasks
 
+### v1.4.0 implementation note
+
+The v1.4 line introduces SPA token login through `POST /api/auth/login`, baseline RBAC permissions for high-value mutation routes, and an `audit_events` table for task, sample, result, exception, and analysis-job actions. Legacy payload identity fields remain accepted for attribution compatibility, but protected user mutations require `Authorization: Bearer <token>`. `X-Ocean-Actor-Id` remains only as an internal transition bridge for non-SPA tooling, and the Python worker uses a separate internal worker bridge until a stronger worker credential is introduced.
+
 ## v1.5.0 — Release Hardening
 
 ### Goal

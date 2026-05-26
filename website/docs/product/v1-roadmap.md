@@ -189,6 +189,36 @@ Add the governance and runtime controls required for a more dependable internal 
 
 The v1.4 line introduces SPA token login through `POST /api/auth/login`, baseline RBAC permissions for high-value mutation routes, and an `audit_events` table for task, sample, result, exception, and analysis-job actions. Legacy payload identity fields remain accepted for attribution compatibility, but protected user mutations require `Authorization: Bearer <token>`. `X-Ocean-Actor-Id` remains only as an internal transition bridge for non-SPA tooling, and the Python worker uses a separate internal worker bridge until a stronger worker credential is introduced.
 
+## v1.4.1 — Settings and User Management Consolidation
+
+### Goal
+
+Consolidate scattered operational preferences and user identity controls into first-class SPA pages before expanding additional governance features.
+
+### Scope
+
+- add a Settings page as the single user-facing entry point for workspace-level options that are currently scattered across the shell and feature panels
+- add a Users page for administrators to view, create, edit, activate/deactivate, and inspect role assignments for internal users
+- add a personal profile path for the current user to review account information and update safe self-service fields
+- keep permission-sensitive user mutations in Laravel with RBAC and audit coverage rather than implementing client-only controls
+- decide which preferences are local-only UI preferences and which require backend persistence before development starts
+
+### Primary deliverables
+
+- SPA navigation entries for Settings and Users
+- documented Settings information architecture, including language, display, workspace behavior, and future notification/import-export placeholders
+- documented user-management API contract for admin-managed user updates and current-user profile updates
+- backend user-management endpoints guarded by baseline RBAC
+- audit events for sensitive user administration actions such as role changes, activation changes, and password resets once those actions are implemented
+
+### Exit criteria
+
+- language and other workspace preferences no longer feel hidden inside unrelated controls
+- admins have one clear page for user administration instead of relying on seeded data or ad hoc backend changes
+- non-admin users can see their own identity and profile details without gaining administrative user-management permissions
+- all user mutations are validated and authorized by Laravel
+- English and Simplified Chinese docs describe the Settings/User Management scope before implementation is marked complete
+
 ## v1.5.0 — Release Hardening
 
 ### Goal

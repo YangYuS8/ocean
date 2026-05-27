@@ -1,0 +1,150 @@
+main:
+  push:
+    - name: docs-pages
+      runner:
+        cpus: 2
+      docker:
+        image: node:20
+        volumes:
+          - cache:/root/.npm:rw
+      lock:
+        key: docs-pages
+        wait: true
+        cancel-in-progress: true
+      stages:
+        - name: install documentation dependencies
+          script: cd website && npm ci
+
+        - name: build documentation site
+          script: |
+            cd website
+            DOCUSAURUS_URL="${DOCUSAURUS_URL:-https://ocean-docs.edgeone.app}" \
+              DOCUSAURUS_BASE_URL="${DOCUSAURUS_BASE_URL:-/}" \
+              npm run build
+
+        - name: deploy documentation to EdgeOne Pages
+          image: tencentcom/deploy-eopages:latest
+          if: '[ -n "${EDGEONE_PAGES_API_TOKEN:-}" ]'
+          settings:
+            project_name: ocean-docs
+            api_token: $EDGEONE_PAGES_API_TOKEN
+            directory: website/build
+
+  pull_request:
+    - name: docs-build-check
+      runner:
+        cpus: 2
+      docker:
+        image: node:20
+        volumes:
+          - cache:/root/.npm:rw
+      stages:
+        - name: install documentation dependencies
+          script: cd website && npm ci
+
+        - name: build documentation site
+          script: |
+            cd website
+            DOCUSAURUS_URL="${DOCUSAURUS_URL:-https://ocean-docs.edgeone.app}" \
+              DOCUSAURUS_BASE_URL="${DOCUSAURUS_BASE_URL:-/}" \
+              npm run build
+
+$:
+  tag_push:
+    - name: release
+      runner:
+        cpus: 2
+      docker:
+        image: cnbcool/default-build-env:latest
+      stages:
+        - name: verify release tag
+          script: |
+            set -euo pipefail
+            case "$CNB_BRANCH" in
+              v[0-9]*.[0-9]*.[0-9]*) ;;
+              *)
+                echo "Skip non-semver tag: $CNB_BRANCH"
+                exit 0
+                ;;
+            esac
+
+            git rev-parse --verify "refs/tags/$CNB_BRANCH"
+
+        - name: generate release notes
+          if: 'case "$CNB_BRANCH" in v[0-9]*.[0-9]*.[0-9]*) exit 0 ;; *) exit 1 ;; esac'
+          script: |
+            set -euo pipefail
+
+            export TAG_NAME="$CNB_BRANCH"
+            previous_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -v "^${TAG_NAME}$" | head -n 1 || true)"
+            if [ -n "$previous_tag" ]; then
+              range="${previous_tag}..${TAG_NAME}"
+              export INTRO="Automated release notes generated from commits since \`${previous_tag}\`."
+              export COMPARE_URL="https://cnb.cool/${CNB_REPO_SLUG}/-/compare/${previous_tag}...${TAG_NAME}"
+            else
+              range="${TAG_NAME}"
+              export INTRO="Automated release notes generated from commits included in \`${TAG_NAME}\`."
+              export COMPARE_URL=""
+            fi
+
+            git log "$range" --reverse --pretty=format:'%H%x1f%h%x1f%an%x1f%s' > commits.tsv
+
+            python3 <<'PY'
+            from collections import OrderedDict
+            import os
+
+            tag = os.environ["TAG_NAME"]
+            intro = os.environ["INTRO"]
+            compare_url = os.environ.get("COMPARE_URL", "")
+
+            groups = OrderedDict([
+                ("feat", ("Features", [])),
+                ("fix", ("Bug Fixes", [])),
+                ("docs", ("Documentation", [])),
+                ("perf", ("Performance", [])),
+                ("refactor", ("Refactoring", [])),
+                ("test", ("Tests", [])),
+                ("build", ("Build", [])),
+                ("ci", ("CI", [])),
+                ("chore", ("Maintenance", [])),
+                ("deps", ("Dependencies", [])),
+                ("other", ("Other Changes", [])),
+            ])
+
+            def classify(subject: str) -> str:
+                prefix = subject.split(":", 1)[0].lower()
+                kind = prefix.split("(", 1)[0]
+                if "deps" in kind or subject.startswith("chore(deps") or subject.startswith("chore(frontend-deps"):
+                    return "deps"
+                return kind if kind in groups else "other"
+
+            with open("commits.tsv", encoding="utf-8") as commits:
+                for line in commits:
+                    line = line.rstrip("\n")
+                    if not line:
+                        continue
+                    full, short, author, subject = line.split("\x1f", 3)
+                    key = classify(subject)
+                    groups[key][1].append(f"-   {subject} (`{short}`, {author})")
+
+            with open("release-notes.md", "w", encoding="utf-8") as out:
+                out.write(f"## Ocean {tag}\n\n")
+                out.write(f"{intro}\n")
+                for _key, (title, entries) in groups.items():
+                    if not entries:
+                        continue
+                    out.write(f"\n## {title}\n\n")
+                    out.write("\n".join(entries))
+                    out.write("\n")
+                out.write("\n## Validation\n\n")
+                out.write("-   Build and runtime validation should follow the project checks documented in `README.md` and `website/docs/operations/deployment.md`.\n")
+                if compare_url:
+                    out.write(f"\n**Full Changelog**: {compare_url}\n")
+            PY
+
+        - name: publish CNB release
+          if: 'case "$CNB_BRANCH" in v[0-9]*.[0-9]*.[0-9]*) exit 0 ;; *) exit 1 ;; esac'
+          type: git:release
+          options:
+            tag: $CNB_BRANCH
+            descriptionFromFile: release-notes.md

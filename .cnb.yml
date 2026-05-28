@@ -7,6 +7,8 @@ main:
         image: node:20
         volumes:
           - cache:/root/.npm:rw
+      imports:
+        - https://cnb.cool/Nesoriel/secret-prod/-/blob/main/cloud-providers/tencent-cloud.yml
       lock:
         key: docs-pages
         wait: true

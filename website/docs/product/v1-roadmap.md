@@ -223,6 +223,39 @@ Consolidate scattered operational preferences and user identity controls into fi
 
 v1.4.1 ships Settings and Users as first-class SPA tabs. Settings combines current-user profile editing, language preference, display density, default workspace tab, and runtime/auth summary. Users gives administrators one page for user listing, filtering, creation, profile/status/password edits, role replacement, activation, and deactivation. Laravel owns all mutations through token-authenticated APIs, persists user preferences in `user_preferences`, and records audit events for user administration, profile updates, and settings updates. Non-admin users can update their own profile/settings but cannot access administrative user management.
 
+## v1.4.2 — Production App Image and Worker Naming
+
+### Goal
+
+Make production deployment easier by packaging the main web application into one deployable image and making service names reflect product responsibilities instead of implementation languages.
+
+### Scope
+
+- add a production `ocean-app` image that combines Nginx, PHP-FPM, Laravel API code, Composer production dependencies, and the built React/Vite SPA
+- keep MariaDB and Redis as separate stateful infrastructure services
+- keep the async analysis worker as a separate runtime service, but rename the current `python` service to a responsibility-oriented name such as `analysis-worker`
+- make the analysis worker image self-contained enough for production by copying worker source and required model/runtime assets instead of relying on development bind mounts
+- preserve the Redis boundary between Laravel and the analysis worker
+- define a production Compose profile or production Compose file that uses the combined app image while keeping local development ergonomics clear
+
+### Primary deliverables
+
+- `docker/app/Dockerfile` or equivalent multi-stage production Dockerfile for Laravel + SPA
+- production Nginx config that serves SPA assets directly and routes `/api/` to Laravel `public/index.php` through local PHP-FPM
+- app entrypoint or supervisor configuration for running Nginx and PHP-FPM in the same app container
+- Compose changes introducing an `app` service for production and renaming the worker-facing service from `python` to `analysis-worker`
+- a production-ready analysis worker image path, or an explicit documented follow-up if model packaging remains external
+- updated operations documentation covering migration execution, storage volumes, worker API base URL, and the renamed services
+
+### Exit criteria
+
+- production deployment can run the main web app from one immutable image without bind-mounting `backend/` or `frontend-spa/`
+- the deployment topology is reduced from `frontend + nginx + php + db + redis + python` to `app + db + redis + analysis-worker` for production
+- uploaded/public storage remains persistent and shareable with the analysis worker where needed
+- the worker service name communicates its role in the product chain rather than the implementation language
+- `docker compose config` and the relevant app-image build command succeed
+- existing backend, SPA, and documentation validation commands still pass
+
 ## v1.5.0 — Release Hardening
 
 ### Goal

@@ -194,6 +194,47 @@ The relevant files are:
 
 The earlier `frontend/` Nuxt implementation remains in the repository as a reference implementation, but it is no longer the default Compose/Nginx runtime.
 
+## v1.4.2 production image direction
+
+The next deployment hardening step is to package the main web application as one production image while keeping infrastructure and analysis workloads isolated.
+
+Recommended production topology:
+
+```text
+app
+  - Nginx
+  - PHP-FPM
+  - Laravel API
+  - built React/Vite SPA
+
+db
+redis
+analysis-worker
+```
+
+The intended `app` image should replace the current production need for separate `frontend`, `nginx`, and `php` containers. It should not include MariaDB, Redis, or the analysis worker process.
+
+The target image should be built with a multi-stage flow:
+
+1. build `frontend-spa/` with `pnpm install --frozen-lockfile` and `pnpm run build`
+2. install backend Composer dependencies with `--no-dev --optimize-autoloader`
+3. copy Laravel source, vendor dependencies, and SPA build output into a runtime image
+4. run Nginx and PHP-FPM together through an entrypoint or supervisor
+
+Production Nginx should serve SPA files directly with history fallback and route `/api/` to Laravel `public/index.php` through local PHP-FPM. Runtime configuration must come from environment variables; do not bake `.env` secrets into the image.
+
+The current `python` service name should be replaced in the production path with `analysis-worker`, because the service role is asynchronous analysis execution, image/model inference, and result write-back. Python remains the implementation language, not the deployment-facing product role.
+
+Storage needs special handling: Laravel public/uploads storage should remain persistent and, when image analysis jobs require local files, should be mounted into `analysis-worker` with the same semantics currently used by `OCEAN_STORAGE_ROOT`.
+
+Migrations should remain an explicit deployment step, for example:
+
+```bash
+docker compose run --rm app php artisan migrate --force
+```
+
+Do not silently run migrations on every web container boot unless the release process explicitly adopts that policy.
+
 ## Long-term direction explicitly not recommended
 
 The project should not continue to treat `Nuxt SSR / Nitro` as the long-term deployment mainline, because:

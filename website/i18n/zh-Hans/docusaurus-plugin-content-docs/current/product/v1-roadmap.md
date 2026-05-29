@@ -223,6 +223,39 @@ v1.4 线路通过 `POST /api/auth/login` 引入 SPA token 登录，为高价值�
 
 v1.4.1 将设置与用户管理作为 SPA 中的一等标签页交付。设置页整合当前用户资料编辑、语言偏好、显示密度、默认工作区标签页，以及运行时 / 认证摘要。用户页为管理员提供统一入口，用于用户列表、筛选、创建、资料 / 状态 / 密码编辑、角色替换、启用与停用。所有变更都由 Laravel 通过 token 认证 API 承担，用户偏好持久化在 `user_preferences`，并为用户管理、个人资料更新和设置更新记录审计事件。非管理员用户可以更新自己的资料和设置，但不能访问管理员级用户管理。
 
+## v1.4.2 — 生产应用镜像与 Worker 命名
+
+### 目标
+
+通过将主体 Web 应用打包为一个可部署镜像来简化生产部署，并让服务命名体现产品职责而不是实现语言。
+
+### 范围
+
+- 增加生产用 `ocean-app` 镜像，将 Nginx、PHP-FPM、Laravel API 代码、Composer 生产依赖和构建后的 React/Vite SPA 合并到同一应用镜像
+- MariaDB 与 Redis 继续作为独立有状态基础设施服务
+- 异步分析 Worker 继续作为独立运行时服务，但将当前 `python` 服务重命名为体现职责的名称，例如 `analysis-worker`
+- 让分析 Worker 镜像更接近生产自包含形态，复制 Worker 源码和必要模型 / 运行时资产，而不是依赖开发期 bind mount
+- 保留 Laravel 与分析 Worker 之间的 Redis 边界
+- 定义生产 Compose profile 或生产 Compose 文件，使用合并后的 app 镜像，同时保持本地开发体验清晰
+
+### 主要交付物
+
+- `docker/app/Dockerfile` 或等价的 Laravel + SPA 多阶段生产 Dockerfile
+- 生产 Nginx 配置：直接服务 SPA 静态资源，并将 `/api/` 通过本地 PHP-FPM 路由到 Laravel `public/index.php`
+- 用于在同一 app 容器中运行 Nginx 与 PHP-FPM 的 entrypoint 或 supervisor 配置
+- Compose 调整：引入生产 `app` 服务，并将面向 Worker 的服务名从 `python` 改为 `analysis-worker`
+- 生产就绪的分析 Worker 镜像路径；如果模型打包仍需外部化，则明确记录为后续项
+- 更新运维文档，覆盖迁移执行、存储卷、Worker API 基址和重命名后的服务
+
+### 退出标准 / 验收标准
+
+- 生产部署可以从一个不可变镜像运行主体 Web 应用，不再 bind mount `backend/` 或 `frontend-spa/`
+- 生产拓扑从 `frontend + nginx + php + db + redis + python` 收敛为 `app + db + redis + analysis-worker`
+- 上传 / public storage 仍可持久化，并能按需与分析 Worker 共享
+- Worker 服务名能表达它在产品链路中的职责，而不是实现语言
+- `docker compose config` 和相关 app 镜像构建命令成功
+- 现有后端、SPA 与文档验证命令继续通过
+
 ## v1.5.0 — 发布加固
 
 ### 目标

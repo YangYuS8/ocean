@@ -194,6 +194,47 @@ docker exec ocean-redis redis-cli LLEN ocean:analysis-jobs:queued
 
 早期 `frontend/` Nuxt 实现仍保留在仓库中作为参考实现，但不再是默认 Compose/Nginx 运行时。
 
+## v1.4.2 生产镜像方向
+
+下一步部署加固应将主体 Web 应用打包为一个生产镜像，同时继续隔离基础设施与分析工作负载。
+
+推荐生产拓扑：
+
+```text
+app
+  - Nginx
+  - PHP-FPM
+  - Laravel API
+  - 构建后的 React/Vite SPA
+
+db
+redis
+analysis-worker
+```
+
+目标 `app` 镜像应替代当前生产路径中对独立 `frontend`、`nginx`、`php` 容器的需求。该镜像不应包含 MariaDB、Redis 或分析 Worker 进程。
+
+目标镜像应通过多阶段流程构建：
+
+1. 在 `frontend-spa/` 中执行 `pnpm install --frozen-lockfile` 与 `pnpm run build`
+2. 以 `--no-dev --optimize-autoloader` 安装后端 Composer 依赖
+3. 将 Laravel 源码、vendor 依赖和 SPA 构建产物复制到运行时镜像
+4. 通过 entrypoint 或 supervisor 在同一个 app 容器中运行 Nginx 与 PHP-FPM
+
+生产 Nginx 应直接服务 SPA 静态文件并提供 history fallback，同时将 `/api/` 通过本地 PHP-FPM 路由到 Laravel `public/index.php`。运行时配置必须来自环境变量，不要把 `.env` 密钥烘焙进镜像。
+
+生产路径中应将当前 `python` 服务名替换为 `analysis-worker`，因为该服务的产品职责是异步分析执行、图像 / 模型推理和结果回写。Python 是实现语言，不应成为面向部署的产品角色名。
+
+存储需要单独处理：Laravel public / uploads storage 应保持持久化；当图像分析作业需要读取本地文件时，应按当前 `OCEAN_STORAGE_ROOT` 语义挂载给 `analysis-worker`。
+
+迁移应继续作为显式部署步骤，例如：
+
+```bash
+docker compose run --rm app php artisan migrate --force
+```
+
+除非发布流程明确采用该策略，否则不要在每次 Web 容器启动时静默执行迁移。
+
 ## 长期不推荐的方向
 
 项目不应继续把 `Nuxt SSR / Nitro` 视作长期部署主线，因为：

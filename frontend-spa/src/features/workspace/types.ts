@@ -9,7 +9,9 @@ export type Notice = {
 
 export type ResourceType = 'inspection_task' | 'sample' | 'sample_result';
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
-export type WorkspaceTab = 'overview' | 'tasks' | 'samples' | 'results' | 'exceptions' | 'analysis';
+export type WorkspaceTab = 'overview' | 'tasks' | 'samples' | 'results' | 'exceptions' | 'analysis' | 'settings' | 'users';
+
+export const workspaceTabs: WorkspaceTab[] = ['overview', 'tasks', 'samples', 'results', 'exceptions', 'analysis', 'settings', 'users'];
 
 export type SampleForm = {
   sample_code: string;
@@ -42,6 +44,40 @@ export type AnalysisJobForm = {
 export type LoginForm = {
   username: string;
   password: string;
+};
+
+export type ProfileForm = {
+  display_name: string;
+  email: string;
+};
+
+export type SettingsForm = {
+  language: 'zh-Hans' | 'en';
+  display_density: 'comfortable' | 'compact';
+  default_workspace_tab: WorkspaceTab;
+};
+
+export type UserFilters = {
+  search: string;
+  status: string;
+  role: string;
+};
+
+export type UserCreateForm = {
+  username: string;
+  display_name: string;
+  email: string;
+  status: string;
+  password: string;
+  roles: string[];
+};
+
+export type UserEditForm = {
+  display_name: string;
+  email: string;
+  status: string;
+  password: string;
+  roles: string[];
 };
 
 export const emptySummary: DashboardSummary = {
@@ -86,4 +122,38 @@ export const initialAnalysisJobForm: AnalysisJobForm = {
 export const initialLoginForm: LoginForm = {
   username: 'admin',
   password: 'password',
+};
+
+export const initialProfileForm: ProfileForm = {
+  display_name: '',
+  email: '',
+};
+
+export const initialSettingsForm: SettingsForm = {
+  language: 'zh-Hans',
+  display_density: 'comfortable',
+  default_workspace_tab: 'overview',
+};
+
+export const initialUserFilters: UserFilters = {
+  search: '',
+  status: '',
+  role: '',
+};
+
+export const initialUserCreateForm: UserCreateForm = {
+  username: '',
+  display_name: '',
+  email: '',
+  status: 'active',
+  password: '',
+  roles: ['inspector'],
+};
+
+export const initialUserEditForm: UserEditForm = {
+  display_name: '',
+  email: '',
+  status: 'active',
+  password: '',
+  roles: [],
 };

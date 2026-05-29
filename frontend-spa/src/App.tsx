@@ -9,7 +9,9 @@ import { ExceptionsPanel } from './features/workspace/panels/ExceptionsPanel';
 import { OverviewPanel } from './features/workspace/panels/OverviewPanel';
 import { ResultsPanel } from './features/workspace/panels/ResultsPanel';
 import { SamplesPanel } from './features/workspace/panels/SamplesPanel';
+import { SettingsPanel } from './features/workspace/panels/SettingsPanel';
 import { TasksPanel } from './features/workspace/panels/TasksPanel';
+import { UsersPanel } from './features/workspace/panels/UsersPanel';
 import type { WorkspaceTab } from './features/workspace/types';
 import { useWorkspace } from './features/workspace/useWorkspace';
 
@@ -75,6 +77,8 @@ function App() {
       resultsLabel={t('tabs.results')}
       exceptionsLabel={t('tabs.exceptions')}
       analysisLabel={t('tabs.analysis')}
+      settingsLabel={t('tabs.settings')}
+      usersLabel={t('tabs.users')}
       summaryMetrics={[
         { label: t('metrics.pendingSamples'), value: workspace.summary.pending_samples },
         { label: t('metrics.todayTasks'), value: workspace.summary.today_inspection_tasks },
@@ -163,6 +167,46 @@ function App() {
           onAnalysisJobFormChange={workspace.setAnalysisJobForm}
           onCreateAnalysisJob={workspace.handleCreateAnalysisJob}
           onAnalysisJobAction={workspace.handleAnalysisJobAction}
+        />
+      </Tabs.Panel>
+
+      <Tabs.Panel value="settings" pt="md">
+        <SettingsPanel
+          t={t}
+          profile={workspace.profile}
+          settings={workspace.settings}
+          profileForm={workspace.profileForm}
+          settingsForm={workspace.settingsForm}
+          isAuthenticated={workspace.isAuthenticated}
+          isAdmin={workspace.isAdmin}
+          onProfileFormChange={workspace.setProfileForm}
+          onSettingsFormChange={workspace.setSettingsForm}
+          onSaveProfile={workspace.handleSaveProfile}
+          onSaveSettings={workspace.handleSaveSettings}
+          onLanguageChange={(value) => void i18n.changeLanguage(value)}
+        />
+      </Tabs.Panel>
+
+      <Tabs.Panel value="users" pt="md">
+        <UsersPanel
+          t={t}
+          users={workspace.users}
+          usersMeta={workspace.usersMeta}
+          selectedUserId={workspace.selectedUserId}
+          selectedUser={workspace.selectedUser}
+          filters={workspace.userFilters}
+          createForm={workspace.userCreateForm}
+          editForm={workspace.userEditForm}
+          forbidden={workspace.usersForbidden}
+          isAdmin={workspace.isAdmin}
+          onFiltersChange={workspace.setUserFilters}
+          onCreateFormChange={workspace.setUserCreateForm}
+          onEditFormChange={workspace.setUserEditForm}
+          onSelectUser={workspace.setSelectedUserId}
+          onCreateUser={workspace.handleCreateUser}
+          onUpdateUser={workspace.handleUpdateUser}
+          onActivation={workspace.handleUserActivation}
+          onPageChange={(page) => void workspace.refreshUsers(page)}
         />
       </Tabs.Panel>
     </WorkspaceShell>

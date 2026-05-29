@@ -48,6 +48,74 @@ export type GovernanceActor = {
   roles: string[];
 };
 
+export type UserStatus = 'active' | 'inactive' | string;
+
+export type UserPreferenceSettings = {
+  language?: 'zh-Hans' | 'en' | string | null;
+  display_density?: 'comfortable' | 'compact' | string | null;
+  default_workspace_tab?: string | null;
+  settings_json?: Record<string, unknown> | null;
+};
+
+export type UserRecord = {
+  id: number;
+  username: string;
+  display_name: string | null;
+  email: string | null;
+  status: UserStatus;
+  roles: string[];
+  preferences?: UserPreferenceSettings | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type ProfileRecord = {
+  id: number;
+  username: string;
+  display_name: string | null;
+  email: string | null;
+  roles: string[];
+  status?: UserStatus;
+};
+
+export type SettingsRecord = UserPreferenceSettings;
+
+export type ProfileUpdatePayload = {
+  display_name?: string | null;
+  email?: string | null;
+};
+
+export type SettingsUpdatePayload = {
+  language?: string;
+  display_density?: string;
+  default_workspace_tab?: string;
+  settings_json?: Record<string, unknown> | null;
+};
+
+export type UserListParams = {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  status?: string;
+  role?: string;
+};
+
+export type UserCreatePayload = {
+  username: string;
+  display_name: string;
+  email?: string | null;
+  status: string;
+  password: string;
+  roles: string[];
+};
+
+export type UserUpdatePayload = {
+  display_name?: string | null;
+  email?: string | null;
+  status?: string;
+  password?: string;
+};
+
 export type AuthLoginPayload = {
   username: string;
   password: string;
@@ -287,10 +355,39 @@ function postJson<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
+function patchJson<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+function putJson<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+function buildQuery(params: Record<string, string | number | undefined>): string {
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') query.set(key, String(value));
+  });
+
+  const value = query.toString();
+  return value ? `?${value}` : '';
+}
+
 export const oceanApi = {
   login: (payload: AuthLoginPayload) => postJson<AuthLoginResponse>('/auth/login', payload),
   logout: () => postJson<AuthLogoutResponse>('/auth/logout', {}),
   me: () => request<AuthMeResponse>('/auth/me'),
+  getProfile: () => request<ProfileRecord>('/profile'),
+  updateProfile: (payload: ProfileUpdatePayload) => patchJson<ProfileRecord>('/profile', payload),
+  getSettings: () => request<SettingsRecord>('/settings'),
+  updateSettings: (payload: SettingsUpdatePayload) => patchJson<SettingsRecord>('/settings', payload),
   getGovernanceMe: () => request<GovernanceMe>('/governance/me'),
   getGovernanceRoles: () => request<GovernanceRolesResponse>('/governance/roles'),
   getDashboardSummary: () => request<DashboardSummary>('/dashboard/summary'),
@@ -320,4 +417,13 @@ export const oceanApi = {
     postJson<MutationResult>('/analysis-jobs', payload),
   cancelAnalysisJob: (id: number) => postJson<MutationResult>(`/analysis-jobs/${id}/cancel`, {}),
   retryAnalysisJob: (id: number) => postJson<MutationResult>(`/analysis-jobs/${id}/retry`, {}),
+
+  listUsers: (params: UserListParams = {}) =>
+    listRequest<UserRecord>(`/users${buildQuery({ page: params.page ?? 1, page_size: params.page_size ?? 20, search: params.search, status: params.status, role: params.role })}`),
+  createUser: (payload: UserCreatePayload) => postJson<UserRecord>('/users', payload),
+  getUser: (id: number) => request<UserRecord>(`/users/${id}`),
+  updateUser: (id: number, payload: UserUpdatePayload) => patchJson<UserRecord>(`/users/${id}`, payload),
+  replaceUserRoles: (id: number, roles: string[]) => putJson<UserRecord>(`/users/${id}/roles`, { roles }),
+  activateUser: (id: number) => postJson<UserRecord>(`/users/${id}/activate`, {}),
+  deactivateUser: (id: number) => postJson<UserRecord>(`/users/${id}/deactivate`, {}),
 };

@@ -7,8 +7,12 @@ import type {
   ExceptionRecord,
   GovernanceActor,
   InspectionTask,
+  ListMeta,
+  ProfileRecord,
   Sample,
   SampleResult,
+  SettingsRecord,
+  UserRecord,
 } from '../../api/client';
 import { oceanApi, setApiAuthToken } from '../../api/client';
 import type {
@@ -17,17 +21,27 @@ import type {
   LoadState,
   LoginForm,
   Notice,
+  ProfileForm,
   ResourceType,
   ResultForm,
   SampleForm,
+  SettingsForm,
+  UserCreateForm,
+  UserEditForm,
+  UserFilters,
 } from './types';
 import {
   emptySummary,
   initialAnalysisJobForm,
   initialExceptionForm,
   initialLoginForm,
+  initialProfileForm,
   initialResultForm,
   initialSampleForm,
+  initialSettingsForm,
+  initialUserCreateForm,
+  initialUserEditForm,
+  initialUserFilters,
 } from './types';
 import { formatError, optionalText, parseJsonObject } from './utils';
 
@@ -96,6 +110,18 @@ export function useWorkspace() {
   const [exceptionForm, setExceptionForm] = useState<ExceptionForm>(initialExceptionForm);
   const [analysisJobForm, setAnalysisJobForm] = useState<AnalysisJobForm>(initialAnalysisJobForm);
   const [loginForm, setLoginForm] = useState<LoginForm>(initialLoginForm);
+  const [profile, setProfile] = useState<ProfileRecord | null>(null);
+  const [settings, setSettings] = useState<SettingsRecord | null>(null);
+  const [profileForm, setProfileForm] = useState<ProfileForm>(initialProfileForm);
+  const [settingsForm, setSettingsForm] = useState<SettingsForm>(initialSettingsForm);
+  const [users, setUsers] = useState<UserRecord[]>([]);
+  const [usersMeta, setUsersMeta] = useState<ListMeta>({ page: 1, page_size: 20, total: 0 });
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
+  const [userFilters, setUserFilters] = useState<UserFilters>(initialUserFilters);
+  const [userCreateForm, setUserCreateForm] = useState<UserCreateForm>(initialUserCreateForm);
+  const [userEditForm, setUserEditForm] = useState<UserEditForm>(initialUserEditForm);
+  const [usersForbidden, setUsersForbidden] = useState(false);
 
   const selectedActor = useMemo(
     () => actorOptions.find((actor) => actor.id === selectedActorId) ?? actorOptions[0],
@@ -105,6 +131,7 @@ export function useWorkspace() {
   const effectiveActor = currentActor ?? selectedActor;
   const effectiveActorId = effectiveActor.id;
   const isAuthenticated = Boolean(authToken && currentActor);
+  const isAdmin = effectiveActor.roles.includes('admin');
 
   useEffect(() => {
     setApiAuthToken(authToken);
@@ -196,6 +223,32 @@ export function useWorkspace() {
     };
   }, [authToken, t]);
 
+  const refreshSettings = useCallback(async () => {
+    if (!authToken) return;
+
+    try {
+      const [nextProfile, nextSettings] = await Promise.all([oceanApi.getProfile(), oceanApi.getSettings()]);
+
+      setProfile(nextProfile);
+      setSettings(nextSettings);
+      setProfileForm({
+        display_name: nextProfile.display_name ?? '',
+        email: nextProfile.email ?? '',
+      });
+      setSettingsForm({
+        language: nextSettings.language === 'en' ? 'en' : 'zh-Hans',
+        display_density: nextSettings.display_density === 'compact' ? 'compact' : 'comfortable',
+        default_workspace_tab: (nextSettings.default_workspace_tab as SettingsForm['default_workspace_tab']) || 'overview',
+      });
+    } catch (error) {
+      setNotice({ tone: 'error', message: formatError(error, t('notices.unexpectedError')) });
+    }
+  }, [authToken, t]);
+
+  useEffect(() => {
+    void refreshSettings();
+  }, [refreshSettings]);
+
   useEffect(() => {
     if (!selectedTaskId) {
       setSelectedTask(null);
@@ -236,6 +289,72 @@ export function useWorkspace() {
       ignore = true;
     };
   }, [selectedSampleId, t]);
+
+  const refreshUsers = useCallback(async (page = 1) => {
+    if (!authToken) return;
+    if (!isAdmin) {
+      setUsersForbidden(true);
+      setUsers([]);
+      setSelectedUserId(null);
+      setSelectedUser(null);
+      return;
+    }
+
+    try {
+      setUsersForbidden(false);
+      const list = await oceanApi.listUsers({
+        page,
+        page_size: usersMeta.page_size || 20,
+        search: userFilters.search.trim() || undefined,
+        status: userFilters.status || undefined,
+        role: userFilters.role || undefined,
+      });
+      setUsers(list.data);
+      setUsersMeta(list.meta);
+      setSelectedUserId((current) => current ?? list.data[0]?.id ?? null);
+    } catch (error) {
+      if ((error as ApiError).status === 403) {
+        setUsersForbidden(true);
+        setUsers([]);
+        setSelectedUserId(null);
+        setSelectedUser(null);
+        return;
+      }
+      setNotice({ tone: 'error', message: formatError(error, t('notices.unexpectedError')) });
+    }
+  }, [authToken, isAdmin, t, userFilters.role, userFilters.search, userFilters.status, usersMeta.page_size]);
+
+  useEffect(() => {
+    void refreshUsers(1);
+  }, [refreshUsers]);
+
+  useEffect(() => {
+    if (!selectedUserId || usersForbidden) {
+      setSelectedUser(null);
+      return;
+    }
+
+    let ignore = false;
+    oceanApi
+      .getUser(selectedUserId)
+      .then((user) => {
+        if (!ignore) {
+          setSelectedUser(user);
+          setUserEditForm({
+            display_name: user.display_name ?? '',
+            email: user.email ?? '',
+            status: user.status || 'active',
+            password: '',
+            roles: user.roles ?? [],
+          });
+        }
+      })
+      .catch((error) => setNotice({ tone: 'error', message: formatError(error, t('notices.unexpectedError')) }));
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedUserId, t, usersForbidden]);
 
   const activeExceptions = useMemo(
     () => exceptions.filter((exception) => exception.status === 'open'),
@@ -393,6 +512,90 @@ export function useWorkspace() {
     }
   }
 
+  async function handleSaveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    try {
+      const nextProfile = await oceanApi.updateProfile({
+        display_name: optionalText(profileForm.display_name),
+        email: optionalText(profileForm.email),
+      });
+      setProfile(nextProfile);
+      setCurrentActor((current) => current ? { ...current, display_name: nextProfile.display_name } : current);
+      setNotice({ tone: 'success', message: t('notices.profileSaved') });
+    } catch (error) {
+      setNotice({ tone: 'error', message: formatError(error, t('notices.unexpectedError')) });
+    }
+  }
+
+  async function handleSaveSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    try {
+      const nextSettings = await oceanApi.updateSettings(settingsForm);
+      setSettings(nextSettings);
+      setNotice({ tone: 'success', message: t('notices.settingsSaved') });
+    } catch (error) {
+      setNotice({ tone: 'error', message: formatError(error, t('notices.unexpectedError')) });
+    }
+  }
+
+  async function handleCreateUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    try {
+      const created = await oceanApi.createUser({
+        username: userCreateForm.username.trim(),
+        display_name: userCreateForm.display_name.trim(),
+        email: optionalText(userCreateForm.email),
+        status: userCreateForm.status,
+        password: userCreateForm.password,
+        roles: userCreateForm.roles,
+      });
+      setNotice({ tone: 'success', message: t('notices.userCreated', { username: created.username }) });
+      setUserCreateForm(initialUserCreateForm);
+      await refreshUsers(1);
+      setSelectedUserId(created.id);
+    } catch (error) {
+      setNotice({ tone: 'error', message: formatError(error, t('notices.forbidden')) });
+    }
+  }
+
+  async function handleUpdateUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedUserId) return;
+
+    try {
+      await oceanApi.updateUser(selectedUserId, {
+        display_name: optionalText(userEditForm.display_name),
+        email: optionalText(userEditForm.email),
+        status: userEditForm.status,
+        password: optionalText(userEditForm.password) ?? undefined,
+      });
+      const updated = await oceanApi.replaceUserRoles(selectedUserId, userEditForm.roles);
+      setSelectedUser(updated);
+      setNotice({ tone: 'success', message: t('notices.userSaved') });
+      await refreshUsers(usersMeta.page);
+    } catch (error) {
+      setNotice({ tone: 'error', message: formatError(error, t('notices.forbidden')) });
+    }
+  }
+
+  async function handleUserActivation(action: 'activate' | 'deactivate') {
+    if (!selectedUserId) return;
+
+    try {
+      const updated = action === 'activate'
+        ? await oceanApi.activateUser(selectedUserId)
+        : await oceanApi.deactivateUser(selectedUserId);
+      setSelectedUser(updated);
+      setNotice({ tone: 'success', message: t(action === 'activate' ? 'notices.userActivated' : 'notices.userDeactivated') });
+      await refreshUsers(usersMeta.page);
+    } catch (error) {
+      setNotice({ tone: 'error', message: formatError(error, t('notices.forbidden')) });
+    }
+  }
+
   function setExceptionTarget(resourceType: ResourceType, resourceId: number | null) {
     setExceptionForm((current) => ({
       ...current,
@@ -444,6 +647,11 @@ export function useWorkspace() {
       setResults([]);
       setExceptions([]);
       setAnalysisJobs([]);
+      setProfile(null);
+      setSettings(null);
+      setUsers([]);
+      setSelectedUser(null);
+      setSelectedUserId(null);
       setSelectedTask(null);
       setSelectedTaskId(null);
       setSelectedSample(null);
@@ -458,12 +666,17 @@ export function useWorkspace() {
     currentActor,
     effectiveActor,
     isAuthenticated,
+    isAdmin,
     summary,
     tasks,
     samples,
     results,
     exceptions,
     analysisJobs,
+    profile,
+    settings,
+    users,
+    usersMeta,
     selectedTaskId,
     selectedTask,
     selectedSampleId,
@@ -478,6 +691,14 @@ export function useWorkspace() {
     resultForm,
     exceptionForm,
     analysisJobForm,
+    profileForm,
+    settingsForm,
+    userFilters,
+    userCreateForm,
+    userEditForm,
+    selectedUserId,
+    selectedUser,
+    usersForbidden,
     activeExceptions,
     activeAnalysisJobs,
     setSelectedTaskId,
@@ -488,7 +709,15 @@ export function useWorkspace() {
     setResultForm,
     setExceptionForm,
     setAnalysisJobForm,
+    setProfileForm,
+    setSettingsForm,
+    setUserFilters,
+    setUserCreateForm,
+    setUserEditForm,
+    setSelectedUserId,
     refreshWorkspace,
+    refreshSettings,
+    refreshUsers,
     handleLogin,
     handleLogout,
     handleTaskAction,
@@ -498,6 +727,11 @@ export function useWorkspace() {
     handleCreateException,
     handleCreateAnalysisJob,
     handleAnalysisJobAction,
+    handleSaveProfile,
+    handleSaveSettings,
+    handleCreateUser,
+    handleUpdateUser,
+    handleUserActivation,
     setExceptionTarget,
     setAnalysisJobTarget,
   };

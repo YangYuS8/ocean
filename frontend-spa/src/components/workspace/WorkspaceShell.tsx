@@ -77,6 +77,8 @@ type WorkspaceShellProps = {
   resultsLabel: string;
   exceptionsLabel: string;
   analysisLabel: string;
+  settingsLabel: string;
+  usersLabel: string;
   summaryMetrics: Array<{ label: string; value: number }>;
   children: ReactNode;
 };
@@ -130,6 +132,8 @@ export function WorkspaceShell({
   resultsLabel,
   exceptionsLabel,
   analysisLabel,
+  settingsLabel,
+  usersLabel,
   summaryMetrics,
   children,
 }: WorkspaceShellProps) {
@@ -294,6 +298,12 @@ export function WorkspaceShell({
               </Tabs.Tab>
               <Tabs.Tab value="analysis" fw={700}>
                 {analysisLabel}
+              </Tabs.Tab>
+              <Tabs.Tab value="settings" fw={700}>
+                {settingsLabel}
+              </Tabs.Tab>
+              <Tabs.Tab value="users" fw={700}>
+                {usersLabel}
               </Tabs.Tab>
             </Tabs.List>
 

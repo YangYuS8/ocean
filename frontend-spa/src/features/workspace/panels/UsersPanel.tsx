@@ -77,7 +77,7 @@ export function UsersPanel({
           <TextInput label={t('fields.displayName')} required value={createForm.display_name} onChange={(event) => onCreateFormChange({ ...createForm, display_name: event.currentTarget.value })} />
           <TextInput label={t('fields.email')} value={createForm.email} onChange={(event) => onCreateFormChange({ ...createForm, email: event.currentTarget.value })} />
           <Select label={t('fields.status')} data={statusOptions} value={createForm.status} allowDeselect={false} onChange={(value) => onCreateFormChange({ ...createForm, status: value || 'active' })} />
-          <PasswordInput label={t('auth.password')} required value={createForm.password} onChange={(event) => onCreateFormChange({ ...createForm, password: event.currentTarget.value })} />
+          <PasswordInput label={t('auth.password')} description={t('users.passwordHint')} required value={createForm.password} onChange={(event) => onCreateFormChange({ ...createForm, password: event.currentTarget.value })} />
           <MultiSelect label={t('users.roles')} data={roleOptions} value={createForm.roles} onChange={(roles) => onCreateFormChange({ ...createForm, roles })} />
         </SimpleGrid>
         <Button type="submit" mt="sm">{t('actions.createUser')}</Button>
@@ -104,7 +104,7 @@ export function UsersPanel({
                 <TextInput label={t('fields.displayName')} value={editForm.display_name} onChange={(event) => onEditFormChange({ ...editForm, display_name: event.currentTarget.value })} />
                 <TextInput label={t('fields.email')} value={editForm.email} onChange={(event) => onEditFormChange({ ...editForm, email: event.currentTarget.value })} />
                 <Select label={t('fields.status')} data={statusOptions} value={editForm.status} allowDeselect={false} onChange={(value) => onEditFormChange({ ...editForm, status: value || 'active' })} />
-                <PasswordInput label={t('users.newPassword')} value={editForm.password} onChange={(event) => onEditFormChange({ ...editForm, password: event.currentTarget.value })} />
+                <PasswordInput label={t('users.newPassword')} description={t('users.passwordHint')} value={editForm.password} onChange={(event) => onEditFormChange({ ...editForm, password: event.currentTarget.value })} />
                 <MultiSelect label={t('users.roles')} data={roleOptions} value={editForm.roles} onChange={(roles) => onEditFormChange({ ...editForm, roles })} />
               </SimpleGrid>
               <Group gap="xs">

@@ -112,20 +112,6 @@ services:
     networks:
       - ocean
 
-  phpmyadmin:
-    container_name: ocean-phpmyadmin
-    image: docker.io/library/phpmyadmin
-    ports:
-      - "${PHPMYADMIN_PORT:-8081}:80"
-    environment:
-      PMA_HOST: ${PMA_HOST:-db}
-      PMA_USER: ${PMA_USER:-root}
-      PMA_PASSWORD: ${PMA_PASSWORD:-root}
-    depends_on:
-      - db
-    networks:
-      - ocean
-
 networks:
   ocean:
     name: ocean-network

@@ -240,8 +240,9 @@ export function useWorkspace() {
         display_density: nextSettings.display_density === 'compact' ? 'compact' : 'comfortable',
         default_workspace_tab: (nextSettings.default_workspace_tab as SettingsForm['default_workspace_tab']) || 'overview',
       });
-    } catch (error) {
-      setNotice({ tone: 'error', message: formatError(error, t('notices.unexpectedError')) });
+    } catch {
+      setProfile(null);
+      setSettings(null);
     }
   }, [authToken, t]);
 
@@ -320,7 +321,9 @@ export function useWorkspace() {
         setSelectedUser(null);
         return;
       }
-      setNotice({ tone: 'error', message: formatError(error, t('notices.unexpectedError')) });
+      setUsers([]);
+      setSelectedUserId(null);
+      setSelectedUser(null);
     }
   }, [authToken, isAdmin, t, userFilters.role, userFilters.search, userFilters.status, usersMeta.page_size]);
 
@@ -349,7 +352,7 @@ export function useWorkspace() {
           });
         }
       })
-      .catch((error) => setNotice({ tone: 'error', message: formatError(error, t('notices.unexpectedError')) }));
+      .catch(() => setSelectedUser(null));
 
     return () => {
       ignore = true;

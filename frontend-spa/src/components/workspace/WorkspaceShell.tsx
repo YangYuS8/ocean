@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import {
   Badge,
   Box,
@@ -8,6 +8,7 @@ import {
   Divider,
   Grid,
   Group,
+  Modal,
   Paper,
   PasswordInput,
   Select,
@@ -137,8 +138,51 @@ export function WorkspaceShell({
   summaryMetrics,
   children,
 }: WorkspaceShellProps) {
+  const [loginOpened, setLoginOpened] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLoginOpened(false);
+    }
+  }, [isAuthenticated]);
+
   return (
     <Box className="app-shell">
+      <Modal
+        opened={loginOpened}
+        onClose={() => setLoginOpened(false)}
+        title={loginTitle}
+        centered
+        radius="lg"
+        size="md"
+        overlayProps={{ backgroundOpacity: 0.55, blur: 5 }}
+        classNames={{ content: 'login-modal', header: 'login-modal-header', title: 'login-modal-title' }}
+      >
+        <Box component="form" onSubmit={onLogin}>
+          <Stack gap="md">
+            <Text size="sm" c="dimmed">
+              {demoAccountsLabel}
+            </Text>
+            <TextInput
+              label={usernameLabel}
+              value={loginUsername}
+              onChange={(event) => onLoginUsernameChange(event.currentTarget.value)}
+              autoComplete="username"
+              data-autofocus
+            />
+            <PasswordInput
+              label={passwordLabel}
+              value={loginPassword}
+              onChange={(event) => onLoginPasswordChange(event.currentTarget.value)}
+              autoComplete="current-password"
+            />
+            <Button type="submit" color="ocean" size="md" fullWidth>
+              {loginLabel}
+            </Button>
+          </Stack>
+        </Box>
+      </Modal>
+
       <Container size="xl" py={{ base: 'md', md: 'xl' }}>
         <Stack gap="md">
           <Paper className="shell-header" p={0} radius="lg">
@@ -166,13 +210,20 @@ export function WorkspaceShell({
                   </Text>
                 </Box>
 
-                <LanguageSwitcher
-                  label={languageLabel}
-                  value={language}
-                  chineseLabel={chineseLabel}
-                  englishLabel={englishLabel}
-                  onChange={onLanguageChange}
-                />
+                <Group align="flex-start" gap="sm" wrap="wrap" justify="flex-end">
+                  {!isAuthenticated ? (
+                    <Button color="ocean" variant="filled" onClick={() => setLoginOpened(true)}>
+                      {loginLabel}
+                    </Button>
+                  ) : null}
+                  <LanguageSwitcher
+                    label={languageLabel}
+                    value={language}
+                    chineseLabel={chineseLabel}
+                    englishLabel={englishLabel}
+                    onChange={onLanguageChange}
+                  />
+                </Group>
               </Group>
 
               <Grid gap="md" align="stretch" p={{ base: 'lg', md: 'xl' }}>
@@ -208,42 +259,32 @@ export function WorkspaceShell({
                           </Text>
                         </Paper>
                       ) : (
-                        <Box component="form" onSubmit={onLogin}>
-                          <Stack gap="sm">
-                          <Text fw={600} c="slate.9">
-                            {loginTitle}
-                          </Text>
-                          <TextInput
-                            label={usernameLabel}
-                            value={loginUsername}
-                            onChange={(event) => onLoginUsernameChange(event.currentTarget.value)}
-                            autoComplete="username"
-                          />
-                          <PasswordInput
-                            label={passwordLabel}
-                            value={loginPassword}
-                            onChange={(event) => onLoginPasswordChange(event.currentTarget.value)}
-                            autoComplete="current-password"
-                          />
-                          <Text size="sm" c="dimmed">
-                            {demoAccountsLabel}
-                          </Text>
-                          {actorOptions.length > 0 ? (
-                            <Select
-                              label={currentActorLabel}
-                              description={governanceHint}
-                              data={actorOptions}
-                              value={String(selectedActorId)}
-                              onChange={(value) => value && onActorChange(Number(value))}
-                              allowDeselect={false}
-                            />
-                          ) : null}
-                          <Button type="submit" color="ocean">
-                            {loginLabel}
-                          </Button>
-                          </Stack>
-                        </Box>
+                        <Paper withBorder radius="md" p="sm" bg="white" className="login-prompt-card">
+                          <Group justify="space-between" gap="sm" align="center">
+                            <Box>
+                              <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                                {loginTitle}
+                              </Text>
+                              <Text size="sm" c="slate.7" mt={3}>
+                                {authTokenStrategyLabel}
+                              </Text>
+                            </Box>
+                            <Button color="ocean" variant="light" onClick={() => setLoginOpened(true)}>
+                              {loginLabel}
+                            </Button>
+                          </Group>
+                        </Paper>
                       )}
+                      {!isAuthenticated && actorOptions.length > 0 ? (
+                        <Select
+                          label={currentActorLabel}
+                          description={governanceHint}
+                          data={actorOptions}
+                          value={String(selectedActorId)}
+                          onChange={(value) => value && onActorChange(Number(value))}
+                          allowDeselect={false}
+                        />
+                      ) : null}
                       <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="sm">
                         <Paper withBorder radius="md" p="sm" bg="white">
                           <Text size="xs" c="dimmed" tt="uppercase" fw={700}>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Tabs } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { apiBase } from './api/client';
@@ -15,14 +15,43 @@ import { UsersPanel } from './features/workspace/panels/UsersPanel';
 import type { WorkspaceTab } from './features/workspace/types';
 import { useWorkspace } from './features/workspace/useWorkspace';
 
+const ACTIVE_TAB_STORAGE_KEY = 'ocean-active-workspace-tab';
+const workspaceTabs: WorkspaceTab[] = ['overview', 'tasks', 'samples', 'results', 'exceptions', 'analysis', 'settings', 'users'];
+
+function isWorkspaceTab(value: unknown): value is WorkspaceTab {
+  return typeof value === 'string' && workspaceTabs.includes(value as WorkspaceTab);
+}
+
+function readStoredActiveTab(): WorkspaceTab | null {
+  const storedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+
+  return isWorkspaceTab(storedTab) ? storedTab : null;
+}
+
 function App() {
   const { t, i18n } = useTranslation();
   const workspace = useWorkspace();
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview');
+  const [activeTab, setActiveTabState] = useState<WorkspaceTab>(() => readStoredActiveTab() ?? 'overview');
+  const initializedDefaultTab = useRef(Boolean(readStoredActiveTab()));
 
   const language = supportedLanguages.includes(i18n.language as SupportedLanguage)
     ? (i18n.language as SupportedLanguage)
     : 'zh-Hans';
+
+  useEffect(() => {
+    if (initializedDefaultTab.current || !isWorkspaceTab(workspace.settings?.default_workspace_tab)) {
+      return;
+    }
+
+    initializedDefaultTab.current = true;
+    setActiveTabState(workspace.settings.default_workspace_tab);
+  }, [workspace.settings?.default_workspace_tab]);
+
+  function setActiveTab(value: WorkspaceTab) {
+    setActiveTabState(value);
+    initializedDefaultTab.current = true;
+    localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, value);
+  }
 
   return (
     <WorkspaceShell

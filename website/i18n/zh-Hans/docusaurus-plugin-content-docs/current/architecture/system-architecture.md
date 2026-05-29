@@ -21,10 +21,10 @@ Browser
 
 平台当前处于前端迁移期：
 
-- `frontend/` 继续作为当前运行流使用的 Nuxt/Vue 实现
-- `frontend-spa/` 在 v1.1.0 中新增，作为目标 React + TypeScript + Vite 基线
-- Laravel 继续维持稳定的 `/api` 契约，以支持两条前端线并存
-- Nginx 继续作为边界层，可在过渡期承接 Nuxt 路径和目标静态 SPA 路径
+- v1.4.3 已完成前端仓库清理：`frontend/` 现在是活跃 React + TypeScript + Vite SPA
+- 旧 Nuxt/Vue 实现已从活跃运行时目录中移除
+- Laravel 继续以稳定 `/api` 契约作为前端集成边界
+- Nginx 继续作为边界层，服务 SPA 静态资源并将 API 流量路由到 Laravel
 
 ## 组件职责
 

@@ -21,10 +21,10 @@ Browser
 
 The platform is intentionally in a frontend transition period:
 
-- `frontend/` remains the active Nuxt/Vue implementation for the current running flow
-- `frontend-spa/` is introduced in v1.1.0 as the target React + TypeScript + Vite baseline
-- Laravel keeps the stable `/api` contract so both frontend lines can coexist during migration
-- Nginx remains the boundary that can switch between the transitional Nuxt path and the target static SPA path
+- v1.4.3 completed the frontend repository cleanup: `frontend/` is now the active React + TypeScript + Vite SPA
+- the old Nuxt/Vue implementation has been removed from the active runtime tree
+- Laravel keeps the stable `/api` contract as the frontend integration boundary
+- Nginx remains the boundary that serves static SPA assets and routes API traffic to Laravel
 
 ## Component responsibilities
 

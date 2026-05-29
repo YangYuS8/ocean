@@ -258,7 +258,7 @@ Make production deployment easier by packaging the main web application into one
 
 ### v1.4.2 implementation note
 
-v1.4.2 ships the production packaging baseline. `compose.prod.yml` introduces an `app` service backed by `docker/app/Dockerfile`, which builds the React/Vite SPA, installs Laravel production Composer dependencies, serves SPA assets through Nginx, and routes `/api/` to local PHP-FPM in the same container. The default and production Compose paths now use `analysis-worker` as the service name for asynchronous model/inference execution, while the implementation source remains in `python/`. The analysis worker image copies worker code and model assets at build time for production use. MariaDB and Redis remain separate services, and migrations remain an explicit deployment step unless `OCEAN_RUN_MIGRATIONS=true` is intentionally enabled.
+v1.4.2 shipped the production packaging baseline. `docker/compose.prod.yml` introduces an `app` service backed by `docker/app/Dockerfile`, which builds the React/Vite SPA, installs Laravel production Composer dependencies, serves SPA assets through Nginx, and routes `/api/` to local PHP-FPM in the same container. The default and production Compose paths use `analysis-worker` as the service name for asynchronous model/inference execution. The analysis worker image copies worker code and model assets at build time for production use. MariaDB and Redis remain separate services, and migrations remain an explicit deployment step unless `OCEAN_RUN_MIGRATIONS=true` is intentionally enabled.
 
 ## v1.4.3 — Repository Structure Normalization
 
@@ -293,6 +293,10 @@ Make the repository layout match the product architecture now that the React/Vit
 - Docker-related files are no longer split unpredictably across the repository root, `nginx/`, `backend/docker/`, frontend directories, and worker directories
 - local and production Compose configurations validate after the moves
 - backend tests, active frontend build, documentation build, app image build, and analysis-worker image build still pass
+
+### v1.4.3 implementation note
+
+v1.4.3 normalizes the active repository layout. The React/Vite SPA is promoted to `frontend/`, the old Nuxt/Vue implementation is removed, the worker source moves to `analysis-worker/`, and Docker-related assets move under `docker/` with explicit local and production Compose files. The root `docker-compose.yml` remains only as a lightweight compatibility include for local onboarding.
 
 ## v1.5.0 — Release Hardening
 

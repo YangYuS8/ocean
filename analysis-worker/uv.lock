@@ -499,7 +499,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ocean-python"
+name = "ocean-analysis-worker"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

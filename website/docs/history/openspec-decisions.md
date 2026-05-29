@@ -11,7 +11,7 @@ This page replaces the deleted root `openspec/` directory as the human-facing su
 Historical decisions already established that:
 
 - the backend workspace belongs in `backend/`
-- PHP runtime configuration belongs under `backend/docker/php/`
+- PHP runtime configuration belongs under `docker/php/`
 - Laravel is the long-term backend runtime
 
 ## 2. P0 API and database foundation

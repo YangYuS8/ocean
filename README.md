@@ -70,10 +70,10 @@ docker exec ocean-php php /var/www/html/artisan migrate:status
 
 ### Frontend SPA development
 
-`frontend-spa/` uses `pnpm` as its preferred package manager:
+`frontend/` uses `pnpm` as its preferred package manager:
 
 ```bash
-cd frontend-spa
+cd frontend
 pnpm install
 pnpm run build
 ```
@@ -81,10 +81,9 @@ pnpm run build
 ## Main directories
 
 - `backend/`: Laravel backend and the legacy lightweight PHP reference baseline
-- `frontend/`: earlier Nuxt/Vue implementation retained as reference material
-- `frontend-spa/`: active React 19 + TypeScript + Vite SPA workspace served by the default Compose/Nginx runtime
-- `python/`: analysis worker implementation and model runtime
-- `nginx/`: Nginx configuration
+- `frontend/`: active React 19 + TypeScript + Vite SPA workspace served by the default Compose/Nginx runtime
+- `analysis-worker/`: analysis worker implementation and model runtime
+- `docker/`: Docker Compose, image, and Nginx configuration
 - `website/`: bilingual Docusaurus documentation site
 
 ## Documentation maintenance rules

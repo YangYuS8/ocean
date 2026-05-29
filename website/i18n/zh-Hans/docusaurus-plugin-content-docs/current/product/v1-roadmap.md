@@ -258,7 +258,7 @@ v1.4.1 将设置与用户管理作为 SPA 中的一等标签页交付。设置�
 
 ### v1.4.2 实现说明
 
-v1.4.2 交付生产打包基线。`compose.prod.yml` 引入由 `docker/app/Dockerfile` 构建的 `app` 服务：该镜像会构建 React/Vite SPA、安装 Laravel 生产 Composer 依赖、通过 Nginx 服务 SPA 静态资源，并将 `/api/` 路由到同容器内的 PHP-FPM。默认与生产 Compose 路径都使用 `analysis-worker` 作为异步模型 / 推理执行服务名，但实现源码仍保留在 `python/`。analysis-worker 镜像在构建时复制 Worker 代码和模型资产，满足生产使用。MariaDB 与 Redis 继续作为独立服务，迁移继续作为显式部署步骤，除非明确启用 `OCEAN_RUN_MIGRATIONS=true`。
+v1.4.2 交付生产打包基线。`docker/compose.prod.yml` 引入由 `docker/app/Dockerfile` 构建的 `app` 服务：该镜像会构建 React/Vite SPA、安装 Laravel 生产 Composer 依赖、通过 Nginx 服务 SPA 静态资源，并将 `/api/` 路由到同容器内的 PHP-FPM。默认与生产 Compose 路径都使用 `analysis-worker` 作为异步模型 / 推理执行服务名。analysis-worker 镜像在构建时复制 Worker 代码和模型资产，满足生产使用。MariaDB 与 Redis 继续作为独立服务，迁移继续作为显式部署步骤，除非明确启用 `OCEAN_RUN_MIGRATIONS=true`。
 
 ## v1.4.3 — 仓库结构规范化
 
@@ -293,6 +293,10 @@ v1.4.2 交付生产打包基线。`compose.prod.yml` 引入由 `docker/app/Docke
 - Docker 相关文件不再分散在仓库根目录、`nginx/`、`backend/docker/`、前端目录和 Worker 目录之间
 - 本地与生产 Compose 配置在移动后仍能通过校验
 - 后端测试、活跃前端构建、文档构建、app 镜像构建和 analysis-worker 镜像构建继续通过
+
+### v1.4.3 实现说明
+
+v1.4.3 规范活跃仓库布局。React/Vite SPA 转正为 `frontend/`，旧 Nuxt/Vue 实现被删除，Worker 源码移动到 `analysis-worker/`，Docker 相关资产移动到 `docker/` 下，并用明确名称区分本地与生产 Compose 文件。根目录 `docker-compose.yml` 仅作为本地上手兼容 include 保留。
 
 ## v1.5.0 — 发布加固
 

@@ -246,7 +246,7 @@ class AnalysisJobLifecycleTest extends TestCase
 
         return $this->withHeaders([
             'Authorization' => '',
-            'X-Ocean-Worker' => 'ocean-python-worker',
+            'X-Ocean-Worker' => 'ocean-analysis-worker',
         ]);
     }
 

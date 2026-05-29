@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ocean_python.yolo_worker import (
+from ocean_analysis_worker.yolo_worker import (
     build_suggestion_payload,
     process_job,
     run_worker_iteration,

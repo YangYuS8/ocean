@@ -13,12 +13,12 @@ Inspection tasks -> Samples -> Results -> Exceptions -> Analysis jobs -> Dashboa
 ## Architecture direction
 
 - Keep **Laravel** as the long-term backend runtime. This is a project constraint.
-- Treat the current Nuxt/Vue frontend as an earlier-phase implementation, not the long-term preferred mainline.
-- Prefer a future business frontend based on **React + TypeScript + Vite SPA**, served as static assets through Nginx.
+- Keep the active business frontend in `frontend/` as a **React + TypeScript + Vite SPA**, served as static assets through Nginx.
+- Treat the removed Nuxt/Vue frontend only as historical context available through documentation and git history.
 - Keep **MariaDB** as the core transactional database.
-- Keep **Redis** as the async boundary between Laravel and Python workers.
-- Keep **Python Worker** responsibilities isolated to analysis, image processing, model inference, and result write-back.
-- Keep deployment simple and repeatable with **Nginx + Docker Compose**.
+- Keep **Redis** as the async boundary between Laravel and `analysis-worker`.
+- Keep `analysis-worker/` responsibilities isolated to analysis, image processing, model inference, and result write-back.
+- Keep deployment simple and repeatable with **Nginx + Docker Compose**, with Docker assets under `docker/`.
 - Keep project documentation in the Docusaurus site under `website/`.
 
 ## Documentation rules
@@ -34,7 +34,7 @@ Inspection tasks -> Samples -> Results -> Exceptions -> Analysis jobs -> Dashboa
 - Preserve the Laravel API contract unless a change explicitly updates the documented contract.
 - Keep business rules, validation, state transitions, and audit-sensitive behavior in Laravel rather than the frontend.
 - Keep frontend code API-driven; do not introduce SSR-only assumptions for the long-term product direction.
-- Keep Python analysis code behind clear job boundaries; do not let Python mutate core business state outside defined write-back paths.
+- Keep analysis-worker code behind clear job boundaries; do not let it mutate core business state outside defined write-back paths.
 - Keep database changes migration-driven and document any state-machine or entity-semantic change.
 - Prefer small, reviewable changes with explicit validation steps.
 - Run the most relevant checks before handing off changes. For documentation-site changes, run:

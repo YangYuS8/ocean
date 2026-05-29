@@ -96,6 +96,12 @@ This keeps the business frontend deployable as static assets and avoids introduc
 - `frontend/` remains in the repository only as an earlier-phase reference implementation
 - the long-term default path is now Browser -> Nginx -> React/Vite SPA static assets -> `/api/` Laravel
 
+### v1.4.3 repository cleanup
+
+- the React/Vite SPA has been promoted from `frontend-spa/` to the canonical `frontend/` path
+- the old Nuxt/Vue implementation has been removed from the active repository tree
+- new frontend work should use `frontend/`
+
 ### v1.3.x frontend design-system correction
 
 - the SPA is upgraded to React 19 and uses Mantine 9 as its open-source component system
@@ -115,12 +121,12 @@ This keeps the business frontend deployable as static assets and avoids introduc
 - workspace state, API orchestration, form state, and derived values belong under `src/features/workspace/`
 - each business slice should have its own panel module under `src/features/workspace/panels/`
 - the default page should expose section navigation for Overview, Tasks, Samples, Results, Exceptions, and Analysis instead of forcing all forms and lists into one continuous canvas
-- `pnpm` is the preferred package manager for `frontend-spa/`; keep `pnpm-lock.yaml` committed and use `pnpm run build` for SPA validation
+- `pnpm` is the preferred package manager for `frontend/`; keep `pnpm-lock.yaml` committed and use `pnpm run build` for SPA validation
 
 ## Repository guidance
 
-- keep `frontend/` intact as reference material unless a later version explicitly retires it
-- place new long-term workspace frontend work under `frontend-spa/`
+- use `frontend/` for the active React/Vite workspace
+- treat the removed Nuxt/Vue implementation as historical context available through docs and git history only
 - keep docs, deployment samples, and architecture language aligned with this transition plan
 - keep user-facing SPA copy in the i18n resource boundary instead of scattering hardcoded mixed-language strings across components
 - keep the SPA component tree modular enough that adding v1.3.x panels does not require expanding `App.tsx`

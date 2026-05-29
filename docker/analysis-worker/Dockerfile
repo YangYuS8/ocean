@@ -30,10 +30,10 @@ ENV UV_CACHE_DIR=/root/.cache/uv
 ENV VIRTUAL_ENV=/workspace/.venv
 ENV PATH="/workspace/.venv/bin:${PATH}"
 
-COPY pyproject.toml uv.lock /workspace/
+COPY analysis-worker/pyproject.toml analysis-worker/uv.lock /workspace/
 RUN uv sync --frozen --no-dev
 
-COPY ocean_python /workspace/ocean_python
-COPY models /workspace/models
+COPY analysis-worker/ocean_analysis_worker /workspace/ocean_analysis_worker
+COPY analysis-worker/models /workspace/models
 
-CMD ["/workspace/.venv/bin/python", "-m", "ocean_python.yolo_worker"]
+CMD ["/workspace/.venv/bin/python", "-m", "ocean_analysis_worker.yolo_worker"]

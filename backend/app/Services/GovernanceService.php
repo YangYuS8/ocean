@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class GovernanceService
 {
-    private const SYSTEM_WORKER_HEADER = 'ocean-python-worker';
+    private const SYSTEM_WORKER_HEADER = 'ocean-analysis-worker';
 
     /** @var array<string, array<int, string>> */
     private const ROLE_PERMISSIONS = [

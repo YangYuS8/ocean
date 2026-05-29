@@ -250,7 +250,7 @@ v1.4.0 优先使用 token 认证 actor 注入，同时仍允许显式传入以�
 Analysis Worker 状态回调使用内部 worker 桥接：
 
 ```http
-X-Ocean-Worker: ocean-python-worker
+X-Ocean-Worker: ocean-analysis-worker
 ```
 
 该桥接会映射到 seed 中的 `worker01` actor，仅用于内部 Compose / 网络环境，直到后续引入真正的 Worker 凭证。

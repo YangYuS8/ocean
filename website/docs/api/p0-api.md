@@ -250,7 +250,7 @@ The `admin` role owns v1.4.1 user-management permissions including `user.list`, 
 Analysis worker status callbacks use the internal worker bridge:
 
 ```http
-X-Ocean-Worker: ocean-python-worker
+X-Ocean-Worker: ocean-analysis-worker
 ```
 
 This bridge maps to the seeded `worker01` actor and is only intended for internal Compose/network use until a real worker credential is introduced.

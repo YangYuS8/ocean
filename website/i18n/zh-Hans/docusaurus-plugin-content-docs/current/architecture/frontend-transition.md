@@ -96,6 +96,12 @@ Browser
 - `frontend/` 仍保留在仓库中，但仅作为早期阶段参考实现
 - 长期默认路径已经切换为 Browser -> Nginx -> React/Vite SPA 静态资源 -> `/api/` Laravel
 
+### v1.4.3 仓库清理
+
+- React/Vite SPA 已从 `frontend-spa/` 转正到规范 `frontend/` 路径
+- 旧 Nuxt/Vue 实现已从活跃仓库树中移除
+- 新前端工作应使用 `frontend/`
+
 ### v1.3.x 前端设计系统修正
 
 - SPA 升级到 React 19，并使用 Mantine 9 作为开源组件系统
@@ -115,12 +121,12 @@ Browser
 - 工作台状态、API 编排、表单状态与派生值放在 `src/features/workspace/`
 - 每个业务切片在 `src/features/workspace/panels/` 下拥有独立面板模块
 - 默认页面应提供总览、任务、样本、结果、异常、分析的分区导航，而不是把所有表单和列表挤进一个连续页面
-- `frontend-spa/` 首选包管理器为 `pnpm`；应提交 `pnpm-lock.yaml`，并使用 `pnpm run build` 验证 SPA
+- `frontend/` 首选包管理器为 `pnpm`；应提交 `pnpm-lock.yaml`，并使用 `pnpm run build` 验证 SPA
 
 ## 仓库维护指导
 
-- 除非后续版本明确退役，否则将 `frontend/` 作为参考资料保留
-- 新的长期工作台前端能力应优先放在 `frontend-spa/`
+- 使用 `frontend/` 作为活跃 React/Vite 工作台路径
+- 将已移除的 Nuxt/Vue 实现视作仅保留在文档和 git 历史中的历史背景
 - 文档、部署样例与架构表述应持续与本迁移方案保持一致
 - SPA 面向用户的文案应维护在 i18n 资源边界中，避免在组件里继续散落中英混杂的硬编码字符串
 - SPA 组件树应保持模块化，后续 v1.3.x 面板扩展不应继续膨胀 `App.tsx`

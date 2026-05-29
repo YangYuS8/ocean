@@ -1,13 +1,13 @@
 FROM node:20-alpine AS frontend-build
 
-WORKDIR /build/frontend-spa
+WORKDIR /build/frontend
 
 RUN corepack enable
 
-COPY frontend-spa/package.json frontend-spa/pnpm-lock.yaml ./
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-COPY frontend-spa/ ./
+COPY frontend/ ./
 RUN pnpm run build
 
 FROM docker.io/library/composer:2 AS backend-vendor
@@ -50,7 +50,7 @@ RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
 
 COPY backend/ /var/www/html/
 COPY --from=backend-vendor /build/backend/vendor /var/www/html/vendor
-COPY --from=frontend-build /build/frontend-spa/dist /usr/share/nginx/html
+COPY --from=frontend-build /build/frontend/dist /usr/share/nginx/html
 COPY docker/app/nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker/app/supervisord.conf /etc/supervisor/conf.d/ocean-app.conf
 COPY docker/app/entrypoint.sh /usr/local/bin/ocean-app-entrypoint

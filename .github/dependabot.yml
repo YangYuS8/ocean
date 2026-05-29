@@ -1,7 +1,7 @@
 version: 2
 
 updates:
-  # 1) 前端：Nuxt / Vue / pnpm
+  # 1) Frontend: React / Vite / pnpm
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
@@ -43,30 +43,30 @@ updates:
         patterns:
           - "*"
 
-  # 3) Python：虽然运行时用 uv，但为了 security updates，建议用 pip 生态解析 pyproject.toml
+  # 3) Analysis worker: implemented in Python and managed by uv.
   - package-ecosystem: "pip"
-    directory: "/python"
+    directory: "/analysis-worker"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0
     labels:
       - "dependencies"
-      - "python"
+      - "analysis-worker"
       - "security"
     assignees:
       - "YangYuS8"
     commit-message:
-      prefix: "chore(python-deps)"
+      prefix: "chore(worker-deps)"
       include: "scope"
     groups:
-      python-security:
+      analysis-worker-security:
         applies-to: security-updates
         patterns:
           - "*"
 
-  # 4) 可选：docker-compose 版本更新
+  # 4) Docker Compose updates
   - package-ecosystem: "docker-compose"
-    directory: "/"
+    directory: "/docker"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 2
@@ -74,7 +74,7 @@ updates:
       - "dependencies"
       - "infra"
 
-  # 5) 可选：GitHub Actions 版本更新
+  # 5) GitHub Actions updates
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

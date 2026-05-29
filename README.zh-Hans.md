@@ -46,7 +46,7 @@ Ocean 是一个面向海洋生态样本管理与设备巡检流程的内部平�
 - Redis / Python 异步边界
 - 更低的运维复杂度
 
-相比 `Nuxt/Vue + SSR/Nitro + Node 常驻运行时`，`Laravel API + React/Vite SPA` 更适合作为长期交付路径。默认 Compose/Nginx 运行时现在服务 `frontend-spa/`，Nuxt/Vue 仅保留为参考实现。
+相比 `Nuxt/Vue + SSR/Nitro + Node 常驻运行时`，`Laravel API + React/Vite SPA` 更适合作为长期交付路径。默认 Compose/Nginx 运行时现在服务 `frontend/` 中的 React/Vite SPA。
 
 ## 运行与初始化
 
@@ -73,10 +73,10 @@ docker exec ocean-php php /var/www/html/artisan migrate:status
 
 ### 前端 SPA 开发
 
-`frontend-spa/` 首选包管理器为 `pnpm`：
+`frontend/` 首选包管理器为 `pnpm`：
 
 ```bash
-cd frontend-spa
+cd frontend
 pnpm install
 pnpm run build
 ```
@@ -84,10 +84,9 @@ pnpm run build
 ## 主要目录
 
 - `backend/`：Laravel 后端与迁移前轻量 PHP 参考基线
-- `frontend/`：早期阶段的 Nuxt/Vue 前端参考实现
-- `frontend-spa/`：默认 Compose/Nginx 运行时服务的 React 19 + TypeScript + Vite SPA 工作台
-- `python/`：analysis-worker 实现与模型运行环境
-- `nginx/`：Nginx 配置
+- `frontend/`：默认 Compose/Nginx 运行时服务的 React 19 + TypeScript + Vite SPA 工作台
+- `analysis-worker/`：analysis-worker 实现与模型运行环境
+- `docker/`：Docker Compose、镜像与 Nginx 配置
 - `website/`：双语 Docusaurus 文档站
 
 ## 文档维护规则

@@ -4,7 +4,7 @@ services:
   app:
     container_name: ocean-app
     build:
-      context: .
+      context: ..
       dockerfile: docker/app/Dockerfile
       args:
         DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.ustc.edu.cn}
@@ -45,7 +45,8 @@ services:
     container_name: ocean-analysis-worker
     restart: unless-stopped
     build:
-      context: ./python
+      context: ..
+      dockerfile: docker/analysis-worker/Dockerfile
       args:
         DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.ustc.edu.cn}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}

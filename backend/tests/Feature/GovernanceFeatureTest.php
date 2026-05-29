@@ -118,7 +118,7 @@ class GovernanceFeatureTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $response = $this->withHeader('X-Ocean-Worker', 'ocean-python-worker')
+        $response = $this->withHeader('X-Ocean-Worker', 'ocean-analysis-worker')
             ->postJson("/api/analysis-jobs/{$jobId}/start");
 
         $response->assertOk()

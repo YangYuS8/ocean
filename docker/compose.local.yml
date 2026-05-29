@@ -1,0 +1,129 @@
+name: ocean
+
+services:
+  frontend:
+    container_name: ocean-frontend
+    build:
+      context: ..
+      dockerfile: docker/frontend/Dockerfile
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://127.0.0.1/
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - ocean
+
+  php:
+    container_name: ocean-php
+    build:
+      context: ..
+      dockerfile: docker/php/Dockerfile
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.ustc.edu.cn}
+    volumes:
+      - ../backend:/var/www/html:Z
+    environment:
+      PHP_IDE_CONFIG: "serverName=php-dev"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE:-test_db}
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PREFIX: ""
+      ANALYSIS_JOB_REDIS_QUEUE: ${ANALYSIS_JOB_REDIS_QUEUE:-ocean:analysis-jobs:queued}
+    networks:
+      - ocean
+
+  nginx:
+    container_name: ocean-nginx
+    image: docker.io/library/nginx:alpine
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ../backend:/var/www/html:Z
+      - ./nginx:/etc/nginx/conf.d:ro,Z
+    depends_on:
+      frontend:
+        condition: service_healthy
+      php:
+        condition: service_started
+    networks:
+      - ocean
+
+  analysis-worker:
+    container_name: ocean-analysis-worker
+    restart: unless-stopped
+    build:
+      context: ..
+      dockerfile: docker/analysis-worker/Dockerfile
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.ustc.edu.cn}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
+    working_dir: /workspace
+    volumes:
+      - ../analysis-worker:/workspace:Z
+      - analysis-worker-venv:/workspace/.venv
+      - ../backend/storage/app/public:/workspace/backend-storage:Z
+      - analysis-worker-uv-cache:/root/.cache/uv
+    environment:
+      OCEAN_API_BASE: http://nginx
+      OCEAN_STORAGE_ROOT: /workspace/backend-storage
+      OCEAN_YOLO_MODEL_PATH: /workspace/models/uprc2018/best.pt
+      OCEAN_WORKER_POLL_SECONDS: 3
+      ANALYSIS_JOB_REDIS_QUEUE: ${ANALYSIS_JOB_REDIS_QUEUE:-ocean:analysis-jobs:queued}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      UV_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+      UV_INSECURE_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
+      VIRTUAL_ENV: /workspace/.venv
+      PATH: /workspace/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    networks:
+      - ocean
+
+  db:
+    container_name: ocean-db
+    image: docker.io/library/mariadb:12
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-test_db}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    networks:
+      - ocean
+
+  redis:
+    container_name: ocean-redis
+    image: docker.io/library/redis:8-alpine
+    volumes:
+      - redis-data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - ocean
+
+networks:
+  ocean:
+    name: ocean-network
+
+volumes:
+  analysis-worker-uv-cache:
+    name: ocean-analysis-worker-uv-cache
+  analysis-worker-venv:
+    name: ocean-analysis-worker-venv
+  mariadb-data:
+    name: ocean-mariadb-data
+  redis-data:
+    name: ocean-redis-data

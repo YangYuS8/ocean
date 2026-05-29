@@ -19,7 +19,7 @@ Inspection tasks -> Samples -> Results -> Exceptions -> Analysis jobs -> Dashboa
 Keep the long-term runtime shape stable:
 
 - Laravel owns backend runtime, validation, workflow transitions, API contracts, and audit-sensitive behavior.
-- React 19 + TypeScript + Vite in `frontend-spa/` is the default business frontend.
+- React 19 + TypeScript + Vite in `frontend/` is the default business frontend.
 - MariaDB is the transactional database.
 - Redis is the async handoff boundary between Laravel and analysis workers.
 - Analysis workers stay focused on analysis, image processing, model inference, and result write-back.
@@ -29,13 +29,12 @@ Keep the long-term runtime shape stable:
 ## Repository layout
 
 - `backend/`: Laravel application and legacy lightweight PHP reference baseline.
-- `frontend-spa/`: default React 19 + TypeScript + Vite SPA, built with Mantine, Tailwind CSS, and react-i18next.
-- `frontend/`: earlier Nuxt/Vue implementation retained as reference material only.
-- `python/`: analysis worker implementation and model runtime.
-- `nginx/`: reverse-proxy configuration.
+- `frontend/`: default React 19 + TypeScript + Vite SPA, built with Mantine, Tailwind CSS, and react-i18next.
+- `analysis-worker/`: analysis worker implementation and model runtime.
+- `docker/`: Docker Compose, image, and reverse-proxy configuration.
 - `website/`: bilingual Docusaurus documentation site.
 
-v1.4.3 is planned to normalize this layout. After that cleanup, the active SPA should use the canonical frontend path, the analysis worker source should use the `analysis-worker/` path, and Docker-related assets should live under `docker/` with local and production Compose files named explicitly.
+v1.4.3 normalized this layout: the active SPA uses the canonical frontend path, the analysis worker source uses the `analysis-worker/` path, and Docker-related assets live under `docker/` with local and production Compose files named explicitly.
 
 Do not restore deleted root-level `docs/` or `openspec/` directories as primary documentation locations.
 
@@ -86,12 +85,12 @@ docker compose exec -T php php /var/www/html/artisan test --compact
 
 ## Frontend SPA development rules
 
-`frontend-spa/` is the default business frontend. The older `frontend/` Nuxt app is retained as reference material only.
+`frontend/` is the default business frontend. The older Nuxt app has been removed from the active repository layout.
 
-Use `pnpm` in `frontend-spa/`:
+Use `pnpm` in `frontend/`:
 
 ```bash
-cd frontend-spa
+cd frontend
 pnpm install
 pnpm run build
 ```
@@ -113,11 +112,11 @@ Design-system rules:
 - Use consistent radii: about 12px for controls/cards and 16px for major surfaces.
 - Avoid glassmorphism, radial gradients, decorative blobs, oversized hero typography, and one-off colors/radii that are not part of the theme.
 
-Mantine skills for frontend work are stored under `frontend-spa/.opencode/skills/` and registered by the root `opencode.json`.
+Mantine skills for frontend work are stored under `frontend/.opencode/skills/` and registered by the root `opencode.json`.
 
 ## Legacy frontend rules
 
-The `frontend/` Nuxt/Vue implementation is not the default runtime. Keep it buildable when dependency PRs touch it, but do not add new long-term business frontend work there unless a PR explicitly explains why.
+The old Nuxt/Vue implementation is no longer part of the active runtime tree. Do not reintroduce it unless a PR explicitly documents the need and migration impact.
 
 Validation command:
 
@@ -129,7 +128,7 @@ pnpm run build
 
 ## Analysis worker rules
 
-Analysis workers own analysis and inference work, not core business workflow authority. They are currently implemented in Python under `python/`.
+Analysis workers own analysis and inference work, not core business workflow authority. They are currently implemented in Python under `analysis-worker/`.
 
 - Use Redis as the async handoff boundary.
 - Use Laravel APIs for job status transitions and result write-back.
@@ -168,7 +167,6 @@ Run the smallest relevant set of checks for your change:
 | Change area | Minimum validation |
 | --- | --- |
 | `backend/` Laravel code | `composer validate --strict`, `php artisan test --compact` or Docker equivalent |
-| `frontend-spa/` | `pnpm run build` |
 | `frontend/` | `pnpm run build` |
 | `website/` | `npm run build` |
 | Docker/Nginx routing | `docker compose up -d --build`, smoke `/`, a deep SPA route, and `/api/dashboard/summary` |
@@ -177,7 +175,7 @@ Run the smallest relevant set of checks for your change:
 For a release candidate, prefer this full set:
 
 ```bash
-cd frontend-spa && pnpm install --frozen-lockfile && pnpm run build
+cd frontend && pnpm install --frozen-lockfile && pnpm run build
 cd ../frontend && pnpm install --frozen-lockfile && pnpm run build
 cd ../website && npm run build
 cd ../backend && composer validate --strict
@@ -194,7 +192,6 @@ Dependency PRs still need review. Check what changed, run the affected build, an
 
 Current package-manager expectations:
 
-- `frontend-spa/`: `pnpm`, commit `pnpm-lock.yaml`.
 - `frontend/`: `pnpm`, commit `pnpm-lock.yaml`.
 - `website/`: `npm`, commit `package-lock.json`.
 - `backend/`: Composer, commit `composer.lock`.

@@ -8,23 +8,26 @@ backend:
       - any-glob-to-any-file:
           - "backend/**"
 
-python:
+analysis-worker:
   - changed-files:
       - any-glob-to-any-file:
-          - "python/**"
+          - "analysis-worker/**"
 
 infra:
   - changed-files:
       - any-glob-to-any-file:
           - "nginx/**"
           - "docker-compose.yml"
+          - "docker/**"
           - ".env.example"
 
 docs:
   - changed-files:
       - any-glob-to-any-file:
           - "docs/**"
+          - "website/**"
           - "README.md"
+          - "README.zh-Hans.md"
           - "openspec/**"
 
 ci:

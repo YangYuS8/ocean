@@ -2,11 +2,8 @@
 .github
 .cnb.yml
 frontend/node_modules
-frontend/.nuxt
-frontend/.output
-frontend-spa/node_modules
-frontend-spa/dist
-frontend-spa/*.tsbuildinfo
+frontend/dist
+frontend/*.tsbuildinfo
 backend/vendor
 backend/node_modules
 backend/storage/logs/*.log
@@ -17,6 +14,6 @@ backend/.env
 backend/bootstrap/cache/*.php
 website/node_modules
 website/build
-python/.venv
-python/__pycache__
+analysis-worker/.venv
+analysis-worker/__pycache__
 **/*.pyc

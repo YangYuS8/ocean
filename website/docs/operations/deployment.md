@@ -18,20 +18,11 @@ Analysis Worker
 Docker Compose
 ```
 
-## v1.1 frontend transition deployment note
+## Frontend transition note
 
-The repository now contains two frontend lines with different roles:
+The repository previously contained two frontend lines during the Nuxt-to-SPA transition. As of v1.4.3, the React/Vite SPA is the canonical `frontend/` directory and the older Nuxt/Vue implementation has been removed from the active runtime tree.
 
-- `frontend/`: current Nuxt/Vue runtime kept for the active flow
-- `frontend-spa/`: target React/Vite SPA baseline for static build output
-
-v1.1.0 does **not** switch the default deployment to the SPA yet. Instead, it delivers the deployable foundation required for the later cutover:
-
-- a standalone SPA build that outputs `frontend-spa/dist`
-- an example Nginx config for serving that directory
-- an example Compose override / Dockerfile path for static SPA builds
-
-This keeps the existing `docker-compose.yml` and current runtime behavior intact while making the target path concrete.
+The historical v1.1 transition work is retained in the roadmap documentation, but deployment operations should now use the normalized v1.4.3 layout described below.
 
 ## Laravel runtime requirements
 
@@ -60,7 +51,7 @@ Current operating assumptions:
 - `analysis_jobs` are persisted in MariaDB
 - Redis list `ANALYSIS_JOB_REDIS_QUEUE` is the async worker handoff boundary
 - `analysis-worker` processes analysis workloads
-- the default YOLO model path is `python/models/uprc2018/best.pt`
+- the default YOLO model path is `analysis-worker/models/uprc2018/best.pt`
 
 Operationally, this should be understood as:
 
@@ -96,7 +87,7 @@ For v1.4.0, the SPA authenticates with `POST /api/auth/login` and sends `Authori
 Analysis Worker callbacks use an internal bridge header while the project waits for a real worker credential:
 
 ```bash
-curl -s -H 'X-Ocean-Worker: ocean-python-worker' http://127.0.0.1:8080/api/analysis-jobs
+curl -s -H 'X-Ocean-Worker: ocean-analysis-worker' http://127.0.0.1:8080/api/analysis-jobs
 ```
 
 ### Audit events
@@ -180,21 +171,22 @@ The delivery rules are:
 
 The default Compose path now serves the React/Vite workspace frontend:
 
-1. `frontend` builds from `frontend-spa/Dockerfile`
+1. `frontend` builds from `docker/frontend/Dockerfile`
 2. the SPA image serves static assets on port `80` with history fallback to `index.html`
 3. top-level Nginx proxies `/` to the SPA container
 4. top-level Nginx routes `/api/` to the Laravel / PHP entry point
 
 The relevant files are:
 
-- `nginx/default.conf`
-- `frontend-spa/Dockerfile`
-- `frontend-spa/nginx.conf`
-- `docker-compose.yml`
+- `docker/nginx/default.conf`
+- `docker/frontend/Dockerfile`
+- `docker/frontend/nginx.conf`
+- `docker/compose.local.yml`
+- root `docker-compose.yml` compatibility include
 
-The earlier `frontend/` Nuxt implementation remains in the repository as a reference implementation, but it is no longer the default Compose/Nginx runtime.
+The earlier Nuxt implementation has been removed from the active repository layout. Historical context remains in the docs and git history.
 
-The default local Compose service for asynchronous analysis is named `analysis-worker`. Its source directory remains `python/` because Python is the implementation language, while the Compose service name now reflects the product role.
+The default local Compose service for asynchronous analysis is named `analysis-worker`, and its source directory is also `analysis-worker/`.
 
 ## v1.4.2 production image direction
 
@@ -218,30 +210,30 @@ The intended `app` image should replace the current production need for separate
 
 The target image should be built with a multi-stage flow:
 
-1. build `frontend-spa/` with `pnpm install --frozen-lockfile` and `pnpm run build`
+1. build `frontend/` with `pnpm install --frozen-lockfile` and `pnpm run build`
 2. install backend Composer dependencies with `--no-dev --optimize-autoloader`
 3. copy Laravel source, vendor dependencies, and SPA build output into a runtime image
 4. run Nginx and PHP-FPM together through an entrypoint or supervisor
 
 Production Nginx should serve SPA files directly with history fallback and route `/api/` to Laravel `public/index.php` through local PHP-FPM. Runtime configuration must come from environment variables; do not bake `.env` secrets into the image.
 
-The current `python` service name should be replaced in the production path with `analysis-worker`, because the service role is asynchronous analysis execution, image/model inference, and result write-back. Python remains the implementation language, not the deployment-facing product role.
+The production path uses `analysis-worker` as both service and source directory name, because the service role is asynchronous analysis execution, image/model inference, and result write-back. Python remains the implementation language, not the deployment-facing product role.
 
 Storage needs special handling: Laravel public/uploads storage should remain persistent and, when image analysis jobs require local files, should be mounted into `analysis-worker` with the same semantics currently used by `OCEAN_STORAGE_ROOT`.
 
 Migrations should remain an explicit deployment step, for example:
 
 ```bash
-docker compose run --rm app php artisan migrate --force
+docker compose -f docker/compose.prod.yml run --rm app php artisan migrate --force
 ```
 
 Do not silently run migrations on every web container boot unless the release process explicitly adopts that policy. The app image supports an explicit opt-in switch, `OCEAN_RUN_MIGRATIONS=true`, for controlled environments that intentionally want startup migrations.
 
 ## v1.4.3 repository layout direction
 
-v1.4.3 should normalize file locations without changing the product runtime responsibilities introduced in v1.4.2.
+v1.4.3 normalized file locations without changing the product runtime responsibilities introduced in v1.4.2.
 
-The target layout is:
+The active layout is:
 
 ```text
 backend/              Laravel API
@@ -251,9 +243,9 @@ docker/               Compose, Nginx, app image, and worker image assets
 website/              Docusaurus documentation site
 ```
 
-The old Nuxt/Vue implementation should no longer occupy the active `frontend/` path. If a small amount of historical context is still useful, keep it in documentation rather than as a full runnable app. The obsolete `docker-compose.spa.example.yml` should be removed when no workflow or documentation still depends on it.
+The old Nuxt/Vue implementation no longer occupies the active `frontend/` path. Historical context is kept in documentation and git history rather than as a full runnable app. The obsolete SPA Compose example has been removed.
 
-Root-level Compose files should be minimized. Prefer explicit Docker paths such as `docker/compose.local.yml` and `docker/compose.prod.yml`; keep a root compatibility entry only if it clearly improves onboarding.
+Root-level Compose files are minimized. Use explicit Docker paths such as `docker/compose.local.yml` and `docker/compose.prod.yml`; the root `docker-compose.yml` remains only as a lightweight compatibility include for local onboarding.
 
 ## Long-term direction explicitly not recommended
 

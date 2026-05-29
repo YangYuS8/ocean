@@ -19,7 +19,7 @@ Ocean 是一个面向海洋生态样本管理与设备巡检流程的内部平�
 长期运行形态应保持稳定：
 
 - Laravel 负责后端运行时、校验、工作流状态流转、API 契约和审计敏感行为。
-- `frontend-spa/` 中的 React 19 + TypeScript + Vite 是默认业务前端。
+- `frontend/` 中的 React 19 + TypeScript + Vite 是默认业务前端。
 - MariaDB 是核心事务数据库。
 - Redis 是 Laravel 与 analysis-worker 之间的异步交接边界。
 - Analysis Worker 聚焦分析、图像处理、模型推理和结果回写。
@@ -29,13 +29,12 @@ Ocean 是一个面向海洋生态样本管理与设备巡检流程的内部平�
 ## 仓库结构
 
 - `backend/`：Laravel 应用与迁移前轻量 PHP 参考基线。
-- `frontend-spa/`：默认 React 19 + TypeScript + Vite SPA，使用 Mantine、Tailwind CSS 与 react-i18next。
-- `frontend/`：早期 Nuxt/Vue 实现，仅作为参考材料保留。
-- `python/`：analysis-worker 实现与模型运行环境。
-- `nginx/`：反向代理配置。
+- `frontend/`：默认 React 19 + TypeScript + Vite SPA，使用 Mantine、Tailwind CSS 与 react-i18next。
+- `analysis-worker/`：analysis-worker 实现与模型运行环境。
+- `docker/`：Docker Compose、镜像与反向代理配置。
 - `website/`：双语 Docusaurus 文档站。
 
-v1.4.3 计划规范该布局。清理后，活跃 SPA 应使用规范前端路径，analysis worker 源码应使用 `analysis-worker/` 路径，Docker 相关资产应统一放在 `docker/` 下，并以明确名称区分本地与生产 Compose 文件。
+v1.4.3 已规范该布局：活跃 SPA 使用规范前端路径，analysis worker 源码使用 `analysis-worker/` 路径，Docker 相关资产统一放在 `docker/` 下，并以明确名称区分本地与生产 Compose 文件。
 
 不要恢复已删除的根目录 `docs/` 或 `openspec/` 作为主要文档位置。
 
@@ -86,12 +85,12 @@ docker compose exec -T php php /var/www/html/artisan test --compact
 
 ## 前端 SPA 开发规范
 
-`frontend-spa/` 是默认业务前端。旧的 `frontend/` Nuxt 应用仅保留为参考材料。
+`frontend/` 是默认业务前端。旧 Nuxt 应用已从活跃仓库结构中移除。
 
-在 `frontend-spa/` 使用 `pnpm`：
+在 `frontend/` 使用 `pnpm`：
 
 ```bash
-cd frontend-spa
+cd frontend
 pnpm install
 pnpm run build
 ```
@@ -113,11 +112,11 @@ pnpm run build
 - 圆角保持一致：控件和卡片约 12px，主要表面约 16px。
 - 避免玻璃拟态、径向渐变、装饰性圆形 / 色块、过大 hero 字体，以及不属于 theme 的一次性颜色和圆角。
 
-前端 Mantine skills 存放在 `frontend-spa/.opencode/skills/`，并由根目录 `opencode.json` 注册。
+前端 Mantine skills 存放在 `frontend/.opencode/skills/`，并由根目录 `opencode.json` 注册。
 
 ## 旧前端规范
 
-`frontend/` Nuxt/Vue 实现不是默认运行时。依赖 PR 触及它时需要保持可构建，但除非 PR 明确说明原因，不应在其中新增长期业务前端能力。
+旧 Nuxt/Vue 实现已不属于活跃运行时目录。除非 PR 明确说明必要性和迁移影响，否则不要重新引入。
 
 验证命令：
 
@@ -129,7 +128,7 @@ pnpm run build
 
 ## Analysis Worker 规范
 
-Analysis Worker 负责分析和推理工作，不负责核心业务流程权威。当前实现位于 `python/`，由 Python 编写。
+Analysis Worker 负责分析和推理工作，不负责核心业务流程权威。当前实现位于 `analysis-worker/`，由 Python 编写。
 
 - 使用 Redis 作为异步交接边界。
 - 使用 Laravel API 推进任务状态并回写结果。
@@ -168,7 +167,6 @@ npm run build
 | 变更区域 | 最小验证 |
 | --- | --- |
 | `backend/` Laravel 代码 | `composer validate --strict`，`php artisan test --compact` 或 Docker 等价命令 |
-| `frontend-spa/` | `pnpm run build` |
 | `frontend/` | `pnpm run build` |
 | `website/` | `npm run build` |
 | Docker/Nginx 路由 | `docker compose up -d --build`，冒烟测试 `/`、一个 SPA 深链接和 `/api/dashboard/summary` |
@@ -177,7 +175,7 @@ npm run build
 发布候选建议运行完整检查：
 
 ```bash
-cd frontend-spa && pnpm install --frozen-lockfile && pnpm run build
+cd frontend && pnpm install --frozen-lockfile && pnpm run build
 cd ../frontend && pnpm install --frozen-lockfile && pnpm run build
 cd ../website && npm run build
 cd ../backend && composer validate --strict
@@ -194,7 +192,6 @@ curl -fsS http://127.0.0.1:8080/api/dashboard/summary
 
 当前包管理器期望：
 
-- `frontend-spa/`：`pnpm`，提交 `pnpm-lock.yaml`。
 - `frontend/`：`pnpm`，提交 `pnpm-lock.yaml`。
 - `website/`：`npm`，提交 `package-lock.json`。
 - `backend/`：Composer，提交 `composer.lock`。

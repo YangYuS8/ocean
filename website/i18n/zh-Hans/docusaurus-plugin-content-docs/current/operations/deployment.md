@@ -18,20 +18,11 @@ Analysis Worker
 Docker Compose
 ```
 
-## v1.1 前端迁移部署说明
+## 前端迁移说明
 
-仓库现在包含两条前端线，职责不同：
+仓库在 Nuxt 到 SPA 迁移期曾包含两条前端线。自 v1.4.3 起，React/Vite SPA 已成为规范 `frontend/` 目录，旧 Nuxt/Vue 实现已从活跃运行时目录中移除。
 
-- `frontend/`：保留当前 Nuxt/Vue 运行时，用于现行流程
-- `frontend-spa/`：目标 React/Vite SPA 基线，用于静态构建产物
-
-v1.1.0 **不会**立刻把默认部署切到 SPA，而是交付后续切换所需的可落地基础：
-
-- 可独立构建、输出到 `frontend-spa/dist` 的 SPA
-- 用于托管该目录的 Nginx 示例配置
-- 用于静态 SPA 构建的 Compose override / Dockerfile 示例
-
-这样可以在不破坏现有 `docker-compose.yml` 和当前运行方式的前提下，把目标路径固定下来。
+历史 v1.1 迁移工作保留在路线图文档中，但部署运维应使用下面的 v1.4.3 规范布局。
 
 ## Laravel 运行要求
 
@@ -60,7 +51,7 @@ docker compose exec php php /var/www/html/artisan migrate:fresh --seed --force
 - `analysis_jobs` 已落在 MariaDB
 - Redis 列表 `ANALYSIS_JOB_REDIS_QUEUE` 是 Worker 的异步交接边界
 - `analysis-worker` 处理分析工作负载
-- 默认 YOLO 模型路径为 `python/models/uprc2018/best.pt`
+- 默认 YOLO 模型路径为 `analysis-worker/models/uprc2018/best.pt`
 
 运维上可理解为：
 
@@ -96,7 +87,7 @@ curl -s http://127.0.0.1:8080/api/governance/roles
 Analysis Worker 回调在引入真正 Worker 凭证前使用内部桥接请求头：
 
 ```bash
-curl -s -H 'X-Ocean-Worker: ocean-python-worker' http://127.0.0.1:8080/api/analysis-jobs
+curl -s -H 'X-Ocean-Worker: ocean-analysis-worker' http://127.0.0.1:8080/api/analysis-jobs
 ```
 
 ### 审计事件
@@ -180,21 +171,22 @@ docker exec ocean-redis redis-cli LLEN ocean:analysis-jobs:queued
 
 默认 Compose 路径现在服务 React/Vite 工作台前端：
 
-1. `frontend` 服务从 `frontend-spa/Dockerfile` 构建
+1. `frontend` 服务从 `docker/frontend/Dockerfile` 构建
 2. SPA 镜像在 `80` 端口提供静态资源，并通过 fallback 返回 `index.html`
 3. 顶层 Nginx 将 `/` 代理到 SPA 容器
 4. 顶层 Nginx 将 `/api/` 路由到 Laravel / PHP 入口
 
 相关文件包括：
 
-- `nginx/default.conf`
-- `frontend-spa/Dockerfile`
-- `frontend-spa/nginx.conf`
-- `docker-compose.yml`
+- `docker/nginx/default.conf`
+- `docker/frontend/Dockerfile`
+- `docker/frontend/nginx.conf`
+- `docker/compose.local.yml`
+- 根目录 `docker-compose.yml` 兼容 include
 
-早期 `frontend/` Nuxt 实现仍保留在仓库中作为参考实现，但不再是默认 Compose/Nginx 运行时。
+早期 Nuxt 实现已从活跃仓库布局中移除。历史背景保留在文档与 git 历史中。
 
-默认本地 Compose 中的异步分析服务命名为 `analysis-worker`。其源码目录仍为 `python/`，因为 Python 是实现语言，而 Compose 服务名现在表达产品职责。
+默认本地 Compose 中的异步分析服务命名为 `analysis-worker`，源码目录也统一为 `analysis-worker/`。
 
 ## v1.4.2 生产镜像方向
 
@@ -218,30 +210,30 @@ analysis-worker
 
 目标镜像应通过多阶段流程构建：
 
-1. 在 `frontend-spa/` 中执行 `pnpm install --frozen-lockfile` 与 `pnpm run build`
+1. 在 `frontend/` 中执行 `pnpm install --frozen-lockfile` 与 `pnpm run build`
 2. 以 `--no-dev --optimize-autoloader` 安装后端 Composer 依赖
 3. 将 Laravel 源码、vendor 依赖和 SPA 构建产物复制到运行时镜像
 4. 通过 entrypoint 或 supervisor 在同一个 app 容器中运行 Nginx 与 PHP-FPM
 
 生产 Nginx 应直接服务 SPA 静态文件并提供 history fallback，同时将 `/api/` 通过本地 PHP-FPM 路由到 Laravel `public/index.php`。运行时配置必须来自环境变量，不要把 `.env` 密钥烘焙进镜像。
 
-生产路径中应将当前 `python` 服务名替换为 `analysis-worker`，因为该服务的产品职责是异步分析执行、图像 / 模型推理和结果回写。Python 是实现语言，不应成为面向部署的产品角色名。
+生产路径将服务名与源码目录统一为 `analysis-worker`，因为该服务的产品职责是异步分析执行、图像 / 模型推理和结果回写。Python 是实现语言，不应成为面向部署的产品角色名。
 
 存储需要单独处理：Laravel public / uploads storage 应保持持久化；当图像分析作业需要读取本地文件时，应按当前 `OCEAN_STORAGE_ROOT` 语义挂载给 `analysis-worker`。
 
 迁移应继续作为显式部署步骤，例如：
 
 ```bash
-docker compose run --rm app php artisan migrate --force
+docker compose -f docker/compose.prod.yml run --rm app php artisan migrate --force
 ```
 
 除非发布流程明确采用该策略，否则不要在每次 Web 容器启动时静默执行迁移。app 镜像支持显式开关 `OCEAN_RUN_MIGRATIONS=true`，供明确希望启动时迁移的受控环境使用。
 
 ## v1.4.3 仓库布局方向
 
-v1.4.3 应在不改变 v1.4.2 已引入的产品运行职责前提下，规范文件位置。
+v1.4.3 已在不改变 v1.4.2 已引入的产品运行职责前提下，规范文件位置。
 
-目标布局为：
+当前活跃布局为：
 
 ```text
 backend/              Laravel API
@@ -251,9 +243,9 @@ docker/               Compose、Nginx、app 镜像和 worker 镜像资产
 website/              Docusaurus 文档站
 ```
 
-旧 Nuxt/Vue 实现不应继续占用活跃 `frontend/` 路径。如果仍需要少量历史背景，应保留在文档中，而不是继续保留完整可运行应用。当没有工作流或文档依赖时，应删除过时的 `docker-compose.spa.example.yml`。
+旧 Nuxt/Vue 实现不再占用活跃 `frontend/` 路径。历史背景保留在文档与 git 历史中，而不是继续保留完整可运行应用。过时的 SPA Compose 示例已删除。
 
-根目录 Compose 文件应尽量减少。优先使用 `docker/compose.local.yml` 与 `docker/compose.prod.yml` 这类明确路径；只有在明显改善上手体验时，才保留根级兼容入口。
+根目录 Compose 文件已最小化。优先使用 `docker/compose.local.yml` 与 `docker/compose.prod.yml` 这类明确路径；根目录 `docker-compose.yml` 仅作为本地上手兼容 include 保留。
 
 ## 长期不推荐的方向
 

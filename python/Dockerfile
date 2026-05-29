@@ -33,4 +33,7 @@ ENV PATH="/workspace/.venv/bin:${PATH}"
 COPY pyproject.toml uv.lock /workspace/
 RUN uv sync --frozen --no-dev
 
-CMD ["sh", "-lc", "test -x /workspace/.venv/bin/python || uv sync --frozen --no-dev; uv sync --frozen --no-dev && /workspace/.venv/bin/python -m ocean_python.yolo_worker"]
+COPY ocean_python /workspace/ocean_python
+COPY models /workspace/models
+
+CMD ["/workspace/.venv/bin/python", "-m", "ocean_python.yolo_worker"]

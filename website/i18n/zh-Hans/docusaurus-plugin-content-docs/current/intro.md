@@ -13,7 +13,7 @@ title: Ocean 文档总览
 - 长期推荐主线为：
   - `Laravel API`
   - `React + TypeScript` 单页应用（`Vite`）
-  - `Python Worker`
+  - 由 Python 实现的 `analysis-worker`
   - `MariaDB`
   - `Redis`
   - `Nginx`

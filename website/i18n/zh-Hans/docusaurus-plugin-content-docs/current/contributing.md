@@ -21,8 +21,8 @@ Ocean 是一个面向海洋生态样本管理与设备巡检流程的内部平�
 - Laravel 负责后端运行时、校验、工作流状态流转、API 契约和审计敏感行为。
 - `frontend-spa/` 中的 React 19 + TypeScript + Vite 是默认业务前端。
 - MariaDB 是核心事务数据库。
-- Redis 是 Laravel 与 Python Worker 之间的异步交接边界。
-- Python Worker 聚焦分析、图像处理、模型推理和结果回写。
+- Redis 是 Laravel 与 analysis-worker 之间的异步交接边界。
+- Analysis Worker 聚焦分析、图像处理、模型推理和结果回写。
 - Nginx + Docker Compose 是简单可重复的部署目标。
 - 详细项目文档统一维护在 `website/`。
 
@@ -31,7 +31,7 @@ Ocean 是一个面向海洋生态样本管理与设备巡检流程的内部平�
 - `backend/`：Laravel 应用与迁移前轻量 PHP 参考基线。
 - `frontend-spa/`：默认 React 19 + TypeScript + Vite SPA，使用 Mantine、Tailwind CSS 与 react-i18next。
 - `frontend/`：早期 Nuxt/Vue 实现，仅作为参考材料保留。
-- `python/`：Python Worker 与模型运行环境。
+- `python/`：analysis-worker 实现与模型运行环境。
 - `nginx/`：反向代理配置。
 - `website/`：双语 Docusaurus 文档站。
 
@@ -125,9 +125,9 @@ pnpm install
 pnpm run build
 ```
 
-## Python Worker 规范
+## Analysis Worker 规范
 
-Python Worker 负责分析和推理工作，不负责核心业务流程权威。
+Analysis Worker 负责分析和推理工作，不负责核心业务流程权威。当前实现位于 `python/`，由 Python 编写。
 
 - 使用 Redis 作为异步交接边界。
 - 使用 Laravel API 推进任务状态并回写结果。

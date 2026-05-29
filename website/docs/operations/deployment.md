@@ -14,7 +14,7 @@ Nginx
   -> React SPA static assets
 MariaDB
 Redis
-Python Worker
+Analysis Worker
 Docker Compose
 ```
 
@@ -53,20 +53,20 @@ To reset the database:
 docker compose exec php php /var/www/html/artisan migrate:fresh --seed --force
 ```
 
-## Python and Redis boundary
+## Analysis Worker and Redis boundary
 
 Current operating assumptions:
 
 - `analysis_jobs` are persisted in MariaDB
 - Redis list `ANALYSIS_JOB_REDIS_QUEUE` is the async worker handoff boundary
-- Python Worker processes analysis workloads
+- `analysis-worker` processes analysis workloads
 - the default YOLO model path is `python/models/uprc2018/best.pt`
 
 Operationally, this should be understood as:
 
 1. Laravel creates and queries jobs
 2. Laravel pushes queued job IDs to Redis after durable database creation
-3. Python Worker consumes Redis, executes supported jobs, and reports results back through Laravel APIs
+3. Analysis Worker consumes Redis, executes supported jobs, and reports results back through Laravel APIs
 
 The default queue name is:
 
@@ -75,7 +75,7 @@ REDIS_PREFIX=
 ANALYSIS_JOB_REDIS_QUEUE=ocean:analysis-jobs:queued
 ```
 
-`REDIS_PREFIX` should remain empty for this worker handoff path so Laravel and the Python worker read and write the same Redis list name.
+`REDIS_PREFIX` should remain empty for this worker handoff path so Laravel and the analysis worker read and write the same Redis list name.
 
 If Redis is temporarily unavailable during job creation, the durable database row is still preserved. Operators can retry failed jobs or requeue jobs once Redis is healthy.
 
@@ -93,7 +93,7 @@ curl -s http://127.0.0.1:8080/api/governance/roles
 
 For v1.4.0, the SPA authenticates with `POST /api/auth/login` and sends `Authorization: Bearer <token>` for protected mutation routes. `X-Ocean-Actor-Id` is an internal identity-injection bridge, not a public authentication mechanism. It remains available for non-SPA tooling during the transition, but protected user mutation routes require bearer tokens.
 
-Python Worker callbacks use an internal bridge header while the project waits for a real worker credential:
+Analysis Worker callbacks use an internal bridge header while the project waits for a real worker credential:
 
 ```bash
 curl -s -H 'X-Ocean-Worker: ocean-python-worker' http://127.0.0.1:8080/api/analysis-jobs
@@ -194,6 +194,8 @@ The relevant files are:
 
 The earlier `frontend/` Nuxt implementation remains in the repository as a reference implementation, but it is no longer the default Compose/Nginx runtime.
 
+The default local Compose service for asynchronous analysis is named `analysis-worker`. Its source directory remains `python/` because Python is the implementation language, while the Compose service name now reflects the product role.
+
 ## v1.4.2 production image direction
 
 The next deployment hardening step is to package the main web application as one production image while keeping infrastructure and analysis workloads isolated.
@@ -233,7 +235,7 @@ Migrations should remain an explicit deployment step, for example:
 docker compose run --rm app php artisan migrate --force
 ```
 
-Do not silently run migrations on every web container boot unless the release process explicitly adopts that policy.
+Do not silently run migrations on every web container boot unless the release process explicitly adopts that policy. The app image supports an explicit opt-in switch, `OCEAN_RUN_MIGRATIONS=true`, for controlled environments that intentionally want startup migrations.
 
 ## Long-term direction explicitly not recommended
 

@@ -59,8 +59,8 @@ services:
     networks:
       - ocean
 
-  python:
-    container_name: ocean-python
+  analysis-worker:
+    container_name: ocean-analysis-worker
     restart: unless-stopped
     build:
       context: ./python
@@ -71,9 +71,9 @@ services:
     working_dir: /workspace
     volumes:
       - ./python:/workspace:Z
-      - python-venv:/workspace/.venv
+      - analysis-worker-venv:/workspace/.venv
       - ./backend/storage/app/public:/workspace/backend-storage:Z
-      - python-uv-cache:/root/.cache/uv
+      - analysis-worker-uv-cache:/root/.cache/uv
     environment:
       OCEAN_API_BASE: http://nginx
       OCEAN_STORAGE_ROOT: /workspace/backend-storage
@@ -117,10 +117,10 @@ networks:
     name: ocean-network
 
 volumes:
-  python-uv-cache:
-    name: ocean-python-uv-cache
-  python-venv:
-    name: ocean-python-venv
+  analysis-worker-uv-cache:
+    name: ocean-analysis-worker-uv-cache
+  analysis-worker-venv:
+    name: ocean-analysis-worker-venv
   mariadb-data:
     name: ocean-mariadb-data
   redis-data:

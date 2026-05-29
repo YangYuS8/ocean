@@ -17,7 +17,7 @@ This is no longer a debate about whether Laravel should stay. The real architect
 ```text
 Laravel API
   + React / TypeScript SPA (Vite)
-  + Python Worker
+  + analysis-worker (Python)
   + MariaDB
   + Redis
   + Nginx
@@ -70,7 +70,7 @@ The highest-value risks in this project are:
 - stable API contracts
 - controlled state machine behavior
 - clear MariaDB data semantics
-- explicit Redis/Python async boundaries
+- explicit Redis/analysis-worker async boundaries
 - repeatable Docker Compose delivery
 
 Those areas deserve the complexity budget more than SSR infrastructure does.
@@ -85,7 +85,7 @@ Docusaurus is only the documentation platform. It is intentionally separate from
 | --- | --- |
 | Backend | Laravel |
 | Business frontend | React + TypeScript + Vite SPA |
-| Async analysis | Python Worker + Redis |
+| Async analysis | analysis-worker (Python) + Redis |
 | Core database | MariaDB |
 | Reverse proxy | Nginx |
 | Orchestration | Docker Compose |

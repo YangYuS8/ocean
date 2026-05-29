@@ -6,7 +6,7 @@ Ocean is an internal platform for marine ecological sample management and equipm
 
 - Backend: `Laravel` (must remain)
 - Business frontend mainline: `React 19 + TypeScript + Vite` SPA with Mantine, Tailwind CSS, and react-i18next
-- Async analysis: `Python Worker`
+- Async analysis: `analysis-worker` implemented in Python
 - Database: `MariaDB`
 - Queue / decoupling boundary: `Redis`
 - Entry proxy: `Nginx`
@@ -83,7 +83,7 @@ pnpm run build
 - `backend/`: Laravel backend and the legacy lightweight PHP reference baseline
 - `frontend/`: earlier Nuxt/Vue implementation retained as reference material
 - `frontend-spa/`: active React 19 + TypeScript + Vite SPA workspace served by the default Compose/Nginx runtime
-- `python/`: Python worker and model runtime
+- `python/`: analysis worker implementation and model runtime
 - `nginx/`: Nginx configuration
 - `website/`: bilingual Docusaurus documentation site
 

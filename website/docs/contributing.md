@@ -21,8 +21,8 @@ Keep the long-term runtime shape stable:
 - Laravel owns backend runtime, validation, workflow transitions, API contracts, and audit-sensitive behavior.
 - React 19 + TypeScript + Vite in `frontend-spa/` is the default business frontend.
 - MariaDB is the transactional database.
-- Redis is the async handoff boundary between Laravel and Python workers.
-- Python workers stay focused on analysis, image processing, model inference, and result write-back.
+- Redis is the async handoff boundary between Laravel and analysis workers.
+- Analysis workers stay focused on analysis, image processing, model inference, and result write-back.
 - Nginx + Docker Compose remain the simple deployment target.
 - Detailed project documentation lives in `website/`.
 
@@ -31,7 +31,7 @@ Keep the long-term runtime shape stable:
 - `backend/`: Laravel application and legacy lightweight PHP reference baseline.
 - `frontend-spa/`: default React 19 + TypeScript + Vite SPA, built with Mantine, Tailwind CSS, and react-i18next.
 - `frontend/`: earlier Nuxt/Vue implementation retained as reference material only.
-- `python/`: Python worker and model runtime.
+- `python/`: analysis worker implementation and model runtime.
 - `nginx/`: reverse-proxy configuration.
 - `website/`: bilingual Docusaurus documentation site.
 
@@ -125,9 +125,9 @@ pnpm install
 pnpm run build
 ```
 
-## Python worker rules
+## Analysis worker rules
 
-Python workers own analysis and inference work, not core business workflow authority.
+Analysis workers own analysis and inference work, not core business workflow authority. They are currently implemented in Python under `python/`.
 
 - Use Redis as the async handoff boundary.
 - Use Laravel APIs for job status transitions and result write-back.

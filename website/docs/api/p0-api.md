@@ -247,7 +247,7 @@ Sensitive user-initiated mutation requests require a bearer token. Legacy payloa
 
 The `admin` role owns v1.4.1 user-management permissions including `user.list`, `user.create`, `user.update`, `user.roles.manage`, and `user.status`. Self-service profile and settings endpoints require a valid token but do not grant administrative user-management access.
 
-Python worker status callbacks use the internal worker bridge:
+Analysis worker status callbacks use the internal worker bridge:
 
 ```http
 X-Ocean-Worker: ocean-python-worker

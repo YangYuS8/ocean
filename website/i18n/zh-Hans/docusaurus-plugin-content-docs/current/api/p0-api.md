@@ -247,7 +247,7 @@ v1.4.0 优先使用 token 认证 actor 注入，同时仍允许显式传入以�
 
 `admin` 角色拥有 v1.4.1 用户管理权限，包括 `user.list`、`user.create`、`user.update`、`user.roles.manage` 与 `user.status`。自助个人资料与设置接口需要有效 token，但不会授予管理员级用户管理权限。
 
-Python Worker 状态回调使用内部 worker 桥接：
+Analysis Worker 状态回调使用内部 worker 桥接：
 
 ```http
 X-Ocean-Worker: ocean-python-worker

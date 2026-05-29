@@ -17,7 +17,7 @@ Laravel 继续作为长期后端运行时，因为它已经承接当前 P0 API �
 ```text
 Laravel API
   + React / TypeScript SPA (Vite)
-  + Python Worker
+  + analysis-worker (Python)
   + MariaDB
   + Redis
   + Nginx
@@ -70,7 +70,7 @@ Nuxt 在生产中通常意味着：
 - 稳定 API 契约
 - 受控状态机行为
 - 清晰的 MariaDB 数据语义
-- 显式的 Redis/Python 异步边界
+- 显式的 Redis/analysis-worker 异步边界
 - 可重复的 Docker Compose 交付
 
 这些领域比 SSR 基础设施更值得消耗工程复杂度预算。
@@ -85,7 +85,7 @@ Docusaurus 只承担文档平台角色，独立放置在 `website/`，不参与�
 | --- | --- |
 | 后端 | Laravel |
 | 业务前端 | React + TypeScript + Vite SPA |
-| 异步分析 | Python Worker + Redis |
+| 异步分析 | analysis-worker (Python) + Redis |
 | 核心数据库 | MariaDB |
 | 反向代理 | Nginx |
 | 编排 | Docker Compose |

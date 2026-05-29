@@ -14,7 +14,7 @@ Browser
       -> Laravel API (/api)
           -> MariaDB
           -> Redis
-          -> Python Worker
+          -> analysis-worker
 ```
 
 ## v1.1 过渡状态
@@ -52,9 +52,9 @@ Laravel 是业务系统中心，负责：
 
 现有 Nuxt 前端在迁移期仍然保留，因为它继续承接当前可运行流程。但从架构定位上，它现在应被视为过渡实现，而不是长期业务前端主线。
 
-### Python Worker
+### Analysis Worker
 
-Python 负责分析与算法执行，包括：
+Analysis Worker 由 Python 实现，负责分析与算法执行，包括：
 
 - 图像处理
 - 自动建议生成
@@ -76,7 +76,7 @@ MariaDB 继续作为核心事务库，存储：
 
 Redis 继续作为异步边界，用于：
 
-- 解耦 Laravel 与 Python Worker
+- 解耦 Laravel 与 analysis-worker
 - 支撑队列、重试和后续编排
 
 ### Nginx
@@ -103,8 +103,8 @@ inspection_tasks
 用户动作
   -> Laravel 创建 analysis_jobs(queued)
   -> Laravel 将任务 id 推入 Redis 列表 ANALYSIS_JOB_REDIS_QUEUE
-  -> Python Worker 消费 Redis 队列
-  -> Python Worker 调用 Laravel 标记 running / succeeded / failed
+  -> analysis-worker 消费 Redis 队列
+  -> analysis-worker 调用 Laravel 标记 running / succeeded / failed
 ```
 
 Redis 只承载 Worker 交接载荷。MariaDB 仍是任务状态、参数、摘要、失败、重试和历史记录的持久事实来源。重试失败任务时会创建新的 queued 数据库记录和新的 Redis 队列项，而不是复活原失败记录。
@@ -113,6 +113,6 @@ Redis 只承载 Worker 交接载荷。MariaDB 仍是任务状态、参数、摘�
 
 1. **后端中心化规则**：状态机和校验留在 Laravel。
 2. **关注点分离**：前端消费 API，而不是承担 SSR 运行时职责。
-3. **异步执行隔离**：Python 不接管主事务工作流。
+3. **异步执行隔离**：analysis-worker 不接管主事务工作流。
 4. **部署路径稳定**：Nginx + Docker Compose 继续作为主交付模型。
 5. **受控前端迁移**：v1.1 先建立并存与部署边界，v1.2 再把核心工作区交付迁移到 SPA。

@@ -13,7 +13,7 @@ Ocean is an internal business platform for **marine ecological sample management
 - The recommended long-term solution line is:
   - `Laravel API`
   - `React + TypeScript` SPA with `Vite`
-  - `Python Worker`
+  - `analysis-worker` implemented in Python
   - `MariaDB`
   - `Redis`
   - `Nginx`

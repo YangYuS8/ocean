@@ -14,7 +14,7 @@ Browser
       -> Laravel API (/api)
           -> MariaDB
           -> Redis
-          -> Python Worker
+          -> analysis-worker
 ```
 
 ## Transition status in v1.1
@@ -52,9 +52,9 @@ In v1.1.0, this SPA is delivered as a foundation skeleton only. It proves the ta
 
 The existing Nuxt frontend remains in place during the transition because it still carries the current working flow. It should now be treated as a transitional implementation rather than the long-term business frontend mainline.
 
-### Python Worker
+### Analysis Worker
 
-Python is reserved for analysis and algorithm execution, including:
+The analysis worker is implemented in Python and reserved for analysis and algorithm execution, including:
 
 - image processing
 - automatic suggestion generation
@@ -76,7 +76,7 @@ MariaDB remains the core transactional store for:
 
 Redis remains the async boundary used to:
 
-- decouple Laravel from Python workers
+- decouple Laravel from analysis workers
 - support queueing, retries, and later orchestration work
 
 ### Nginx
@@ -103,8 +103,8 @@ inspection_tasks
 User action
   -> Laravel creates analysis_jobs(queued)
   -> Laravel pushes job id to Redis list ANALYSIS_JOB_REDIS_QUEUE
-  -> Python Worker consumes the Redis queue
-  -> Python Worker calls Laravel to mark running / succeeded / failed
+  -> analysis-worker consumes the Redis queue
+  -> analysis-worker calls Laravel to mark running / succeeded / failed
 ```
 
 Redis carries only the worker handoff payload. MariaDB remains the durable source of truth for job status, parameters, summaries, failures, retries, and historical records. Retrying a failed job creates a new queued database row and a new Redis queue entry instead of reviving the old failed record.
@@ -113,6 +113,6 @@ Redis carries only the worker handoff payload. MariaDB remains the durable sourc
 
 1. **Backend-centric rules**: state machines and validation stay in Laravel.
 2. **Separated concerns**: the frontend consumes APIs instead of owning SSR responsibilities.
-3. **Isolated async execution**: Python does not own the main transactional workflow.
+3. **Isolated async execution**: the analysis worker does not own the main transactional workflow.
 4. **Stable deployment path**: Nginx + Docker Compose stays the main delivery model.
 5. **Controlled frontend transition**: v1.1 establishes coexistence and deployment boundaries before v1.2 moves core workspace delivery onto the SPA.

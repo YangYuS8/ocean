@@ -184,7 +184,7 @@ Key retry rule:
 - retrying a failed job must not revive the original record
 - the original `failed` record must remain in history
 - a retry creates a new `queued` record
-- each new `queued` record is handed to Python workers through the Redis queue configured by `ANALYSIS_JOB_REDIS_QUEUE`
+- each new `queued` record is handed to analysis workers through the Redis queue configured by `ANALYSIS_JOB_REDIS_QUEUE`
 - Redis queue entries are handoff signals; the database record remains the durable state source
 
 ## Initialization and migration principles

@@ -14,7 +14,7 @@ Nginx
   -> React SPA 静态资源
 MariaDB
 Redis
-Python Worker
+Analysis Worker
 Docker Compose
 ```
 
@@ -53,20 +53,20 @@ docker compose exec php php /var/www/html/artisan migrate --seed --force
 docker compose exec php php /var/www/html/artisan migrate:fresh --seed --force
 ```
 
-## Python 与 Redis 边界
+## Analysis Worker 与 Redis 边界
 
 当前运行假设：
 
 - `analysis_jobs` 已落在 MariaDB
 - Redis 列表 `ANALYSIS_JOB_REDIS_QUEUE` 是 Worker 的异步交接边界
-- Python Worker 处理分析工作负载
+- `analysis-worker` 处理分析工作负载
 - 默认 YOLO 模型路径为 `python/models/uprc2018/best.pt`
 
 运维上可理解为：
 
 1. Laravel 创建并查询任务
 2. Laravel 在数据库持久化成功后，将排队任务 id 推入 Redis
-3. Python Worker 消费 Redis，执行受支持任务，并通过 Laravel API 回写结果
+3. Analysis Worker 消费 Redis，执行受支持任务，并通过 Laravel API 回写结果
 
 默认队列名为：
 
@@ -75,7 +75,7 @@ REDIS_PREFIX=
 ANALYSIS_JOB_REDIS_QUEUE=ocean:analysis-jobs:queued
 ```
 
-该 Worker 交接路径中 `REDIS_PREFIX` 应保持为空，以确保 Laravel 与 Python Worker 读写同一个 Redis 列表名。
+该 Worker 交接路径中 `REDIS_PREFIX` 应保持为空，以确保 Laravel 与 analysis-worker 读写同一个 Redis 列表名。
 
 如果创建任务时 Redis 短暂不可用，数据库中的持久任务记录仍会保留。运维人员可在 Redis 恢复后重试失败任务或重新入队。
 
@@ -93,7 +93,7 @@ curl -s http://127.0.0.1:8080/api/governance/roles
 
 在 v1.4.0 中，SPA 通过 `POST /api/auth/login` 登录，并在受保护写路由中发送 `Authorization: Bearer <token>`。`X-Ocean-Actor-Id` 是内部身份注入桥接，不是公开认证机制；它仅在过渡期作为非 SPA 工具的内部路径保留，用户发起的受保护写操作需要 bearer token。
 
-Python Worker 回调在引入真正 Worker 凭证前使用内部桥接请求头：
+Analysis Worker 回调在引入真正 Worker 凭证前使用内部桥接请求头：
 
 ```bash
 curl -s -H 'X-Ocean-Worker: ocean-python-worker' http://127.0.0.1:8080/api/analysis-jobs
@@ -194,6 +194,8 @@ docker exec ocean-redis redis-cli LLEN ocean:analysis-jobs:queued
 
 早期 `frontend/` Nuxt 实现仍保留在仓库中作为参考实现，但不再是默认 Compose/Nginx 运行时。
 
+默认本地 Compose 中的异步分析服务命名为 `analysis-worker`。其源码目录仍为 `python/`，因为 Python 是实现语言，而 Compose 服务名现在表达产品职责。
+
 ## v1.4.2 生产镜像方向
 
 下一步部署加固应将主体 Web 应用打包为一个生产镜像，同时继续隔离基础设施与分析工作负载。
@@ -233,7 +235,7 @@ analysis-worker
 docker compose run --rm app php artisan migrate --force
 ```
 
-除非发布流程明确采用该策略，否则不要在每次 Web 容器启动时静默执行迁移。
+除非发布流程明确采用该策略，否则不要在每次 Web 容器启动时静默执行迁移。app 镜像支持显式开关 `OCEAN_RUN_MIGRATIONS=true`，供明确希望启动时迁移的受控环境使用。
 
 ## 长期不推荐的方向
 

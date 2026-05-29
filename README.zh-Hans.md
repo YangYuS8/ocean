@@ -7,7 +7,7 @@ Ocean 是一个面向海洋生态样本管理与设备巡检流程的内部平�
 - 后端：`Laravel`（必须保留）
 - 业务前端主线：`React 19 + TypeScript + Vite` 单页应用，使用 Mantine、Tailwind CSS 与 react-i18next
 - 历史前端：`frontend/` 中的 Nuxt/Vue 实现保留为参考材料
-- 异步分析：`Python Worker`
+- 异步分析：`analysis-worker`，由 Python 实现
 - 数据库：`MariaDB`
 - 队列 / 解耦边界：`Redis`
 - 入口代理：`Nginx`
@@ -86,7 +86,7 @@ pnpm run build
 - `backend/`：Laravel 后端与迁移前轻量 PHP 参考基线
 - `frontend/`：早期阶段的 Nuxt/Vue 前端参考实现
 - `frontend-spa/`：默认 Compose/Nginx 运行时服务的 React 19 + TypeScript + Vite SPA 工作台
-- `python/`：Python Worker 与模型运行环境
+- `python/`：analysis-worker 实现与模型运行环境
 - `nginx/`：Nginx 配置
 - `website/`：双语 Docusaurus 文档站
 

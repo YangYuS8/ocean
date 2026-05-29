@@ -80,7 +80,7 @@ This page consolidates the old role analysis, functional requirements, and non-f
 
 ### Maintainability
 
-- preserve clear boundaries across Laravel, the SPA frontend, Python workers, MariaDB, Redis, Nginx, and Compose
+- preserve clear boundaries across Laravel, the SPA frontend, analysis workers, MariaDB, Redis, Nginx, and Compose
 - avoid premature microservice or orchestration expansion
 
 ## Explicitly out of scope for the current phase

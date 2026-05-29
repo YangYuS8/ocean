@@ -80,7 +80,7 @@ title: 角色与需求
 
 ### 可维护性
 
-- 保持 Laravel、SPA 前端、Python Worker、MariaDB、Redis、Nginx、Compose 的清晰边界
+- 保持 Laravel、SPA 前端、analysis-worker、MariaDB、Redis、Nginx、Compose 的清晰边界
 - 避免过早引入微服务和复杂编排
 
 ## 当前阶段明确不纳入范围

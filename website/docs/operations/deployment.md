@@ -237,6 +237,24 @@ docker compose run --rm app php artisan migrate --force
 
 Do not silently run migrations on every web container boot unless the release process explicitly adopts that policy. The app image supports an explicit opt-in switch, `OCEAN_RUN_MIGRATIONS=true`, for controlled environments that intentionally want startup migrations.
 
+## v1.4.3 repository layout direction
+
+v1.4.3 should normalize file locations without changing the product runtime responsibilities introduced in v1.4.2.
+
+The target layout is:
+
+```text
+backend/              Laravel API
+frontend/             active React/Vite SPA
+analysis-worker/      async analysis worker implemented in Python
+docker/               Compose, Nginx, app image, and worker image assets
+website/              Docusaurus documentation site
+```
+
+The old Nuxt/Vue implementation should no longer occupy the active `frontend/` path. If a small amount of historical context is still useful, keep it in documentation rather than as a full runnable app. The obsolete `docker-compose.spa.example.yml` should be removed when no workflow or documentation still depends on it.
+
+Root-level Compose files should be minimized. Prefer explicit Docker paths such as `docker/compose.local.yml` and `docker/compose.prod.yml`; keep a root compatibility entry only if it clearly improves onboarding.
+
 ## Long-term direction explicitly not recommended
 
 The project should not continue to treat `Nuxt SSR / Nitro` as the long-term deployment mainline, because:

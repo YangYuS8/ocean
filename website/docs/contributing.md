@@ -35,6 +35,8 @@ Keep the long-term runtime shape stable:
 - `nginx/`: reverse-proxy configuration.
 - `website/`: bilingual Docusaurus documentation site.
 
+v1.4.3 is planned to normalize this layout. After that cleanup, the active SPA should use the canonical frontend path, the analysis worker source should use the `analysis-worker/` path, and Docker-related assets should live under `docker/` with local and production Compose files named explicitly.
+
 Do not restore deleted root-level `docs/` or `openspec/` directories as primary documentation locations.
 
 ## Branch and pull request expectations

@@ -35,6 +35,8 @@ Ocean 是一个面向海洋生态样本管理与设备巡检流程的内部平�
 - `nginx/`：反向代理配置。
 - `website/`：双语 Docusaurus 文档站。
 
+v1.4.3 计划规范该布局。清理后，活跃 SPA 应使用规范前端路径，analysis worker 源码应使用 `analysis-worker/` 路径，Docker 相关资产应统一放在 `docker/` 下，并以明确名称区分本地与生产 Compose 文件。
+
 不要恢复已删除的根目录 `docs/` 或 `openspec/` 作为主要文档位置。
 
 ## 分支与 Pull Request 期望

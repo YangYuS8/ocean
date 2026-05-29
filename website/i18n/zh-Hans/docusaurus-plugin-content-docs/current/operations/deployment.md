@@ -237,6 +237,24 @@ docker compose run --rm app php artisan migrate --force
 
 除非发布流程明确采用该策略，否则不要在每次 Web 容器启动时静默执行迁移。app 镜像支持显式开关 `OCEAN_RUN_MIGRATIONS=true`，供明确希望启动时迁移的受控环境使用。
 
+## v1.4.3 仓库布局方向
+
+v1.4.3 应在不改变 v1.4.2 已引入的产品运行职责前提下，规范文件位置。
+
+目标布局为：
+
+```text
+backend/              Laravel API
+frontend/             活跃 React/Vite SPA
+analysis-worker/      由 Python 实现的异步分析 Worker
+docker/               Compose、Nginx、app 镜像和 worker 镜像资产
+website/              Docusaurus 文档站
+```
+
+旧 Nuxt/Vue 实现不应继续占用活跃 `frontend/` 路径。如果仍需要少量历史背景，应保留在文档中，而不是继续保留完整可运行应用。当没有工作流或文档依赖时，应删除过时的 `docker-compose.spa.example.yml`。
+
+根目录 Compose 文件应尽量减少。优先使用 `docker/compose.local.yml` 与 `docker/compose.prod.yml` 这类明确路径；只有在明显改善上手体验时，才保留根级兼容入口。
+
 ## 长期不推荐的方向
 
 项目不应继续把 `Nuxt SSR / Nitro` 视作长期部署主线，因为：

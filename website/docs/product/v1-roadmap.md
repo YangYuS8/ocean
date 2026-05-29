@@ -260,6 +260,40 @@ Make production deployment easier by packaging the main web application into one
 
 v1.4.2 ships the production packaging baseline. `compose.prod.yml` introduces an `app` service backed by `docker/app/Dockerfile`, which builds the React/Vite SPA, installs Laravel production Composer dependencies, serves SPA assets through Nginx, and routes `/api/` to local PHP-FPM in the same container. The default and production Compose paths now use `analysis-worker` as the service name for asynchronous model/inference execution, while the implementation source remains in `python/`. The analysis worker image copies worker code and model assets at build time for production use. MariaDB and Redis remain separate services, and migrations remain an explicit deployment step unless `OCEAN_RUN_MIGRATIONS=true` is intentionally enabled.
 
+## v1.4.3 — Repository Structure Normalization
+
+### Goal
+
+Make the repository layout match the product architecture now that the React/Vite SPA and `analysis-worker` are the default runtime paths, reducing historical naming noise before the v1.5 release-hardening phase.
+
+### Scope
+
+- promote `frontend-spa/` to a first-class `frontend/` or `web/` directory name and update all Compose, Docker, documentation, Opencode skill, GitHub labeler, Dependabot, and validation references
+- retire the old Nuxt/Vue `frontend/` line from the default repository shape; delete it if no remaining tests or reference-only files are still needed, or move a minimal archived note into documentation instead of keeping a full runnable app
+- rename the implementation directory `python/` to `analysis-worker/` so the source tree, Docker service, and product responsibility use the same vocabulary
+- collect Docker and Compose assets under `docker/` with explicit names, for example `docker/compose.local.yml`, `docker/compose.prod.yml`, `docker/app/`, `docker/analysis-worker/`, and `docker/nginx/`
+- remove obsolete deployment examples such as `docker-compose.spa.example.yml` once the SPA is the default frontend and production app image path exists
+- keep root-level entry points small and intentional: `README.md`, `README.zh-Hans.md`, `.env.example`, and optionally a root `docker-compose.yml` compatibility shim only if it materially improves local onboarding
+- update ignore rules so build output and local caches from the renamed directories stay untracked
+
+### Primary deliverables
+
+- renamed active frontend directory with preserved `pnpm-lock.yaml`, Mantine skills, and build behavior
+- removed or archived Nuxt/Vue reference frontend, including cleanup of stale package locks, tests, Dockerfile, and CI/dependency references
+- renamed `analysis-worker/` source directory with updated Dockerfiles, Compose files, worker storage paths, and model path documentation
+- Docker directory hierarchy that owns app image config, worker image config, Nginx config, and Compose files with clear local/production naming
+- deleted `docker-compose.spa.example.yml` if no longer referenced by docs or workflows
+- updated English and Simplified Chinese docs for architecture, operations, contributing, README, and roadmap references
+
+### Exit criteria
+
+- a new contributor can infer the active runtime from directory names without knowing the historical Nuxt-to-SPA transition
+- `frontend-spa/` and `python/` no longer appear as active path names outside historical roadmap notes
+- the old Nuxt/Vue frontend is removed or clearly archived outside the active runtime path
+- Docker-related files are no longer split unpredictably across the repository root, `nginx/`, `backend/docker/`, frontend directories, and worker directories
+- local and production Compose configurations validate after the moves
+- backend tests, active frontend build, documentation build, app image build, and analysis-worker image build still pass
+
 ## v1.5.0 — Release Hardening
 
 ### Goal

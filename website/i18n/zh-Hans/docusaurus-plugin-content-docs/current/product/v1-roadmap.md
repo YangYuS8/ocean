@@ -260,6 +260,40 @@ v1.4.1 将设置与用户管理作为 SPA 中的一等标签页交付。设置�
 
 v1.4.2 交付生产打包基线。`compose.prod.yml` 引入由 `docker/app/Dockerfile` 构建的 `app` 服务：该镜像会构建 React/Vite SPA、安装 Laravel 生产 Composer 依赖、通过 Nginx 服务 SPA 静态资源，并将 `/api/` 路由到同容器内的 PHP-FPM。默认与生产 Compose 路径都使用 `analysis-worker` 作为异步模型 / 推理执行服务名，但实现源码仍保留在 `python/`。analysis-worker 镜像在构建时复制 Worker 代码和模型资产，满足生产使用。MariaDB 与 Redis 继续作为独立服务，迁移继续作为显式部署步骤，除非明确启用 `OCEAN_RUN_MIGRATIONS=true`。
 
+## v1.4.3 — 仓库结构规范化
+
+### 目标
+
+在 React/Vite SPA 与 `analysis-worker` 已成为默认运行路径后，让仓库布局与产品架构一致，在 v1.5 发布加固前清理历史命名噪音。
+
+### 范围
+
+- 将 `frontend-spa/` 转正为一等目录名，例如 `frontend/` 或 `web/`，并更新所有 Compose、Docker、文档、Opencode skill、GitHub labeler、Dependabot 和验证命令引用
+- 将旧 Nuxt/Vue `frontend/` 从默认仓库结构中退场；如果没有仍需保留的测试或参考文件，则删除它，或只在文档中保留最小归档说明，而不是继续保留完整可运行应用
+- 将实现目录 `python/` 重命名为 `analysis-worker/`，让源码树、Docker 服务和产品职责使用同一套词汇
+- 将 Docker 与 Compose 资产集中到 `docker/` 下并使用明确命名，例如 `docker/compose.local.yml`、`docker/compose.prod.yml`、`docker/app/`、`docker/analysis-worker/`、`docker/nginx/`
+- 在 SPA 已成为默认前端且生产 app 镜像路径已存在后，删除 `docker-compose.spa.example.yml` 等过时部署示例
+- 保持根目录入口小而明确：`README.md`、`README.zh-Hans.md`、`.env.example`，以及只有在明显改善本地上手时才保留根级 `docker-compose.yml` 兼容入口
+- 更新 ignore 规则，确保重命名目录下的构建产物和本地缓存不会被跟踪
+
+### 主要交付物
+
+- 重命名后的活跃前端目录，并保留 `pnpm-lock.yaml`、Mantine skills 和构建行为
+- 删除或归档旧 Nuxt/Vue 参考前端，同时清理过期 package lock、测试、Dockerfile、CI 与依赖配置引用
+- 重命名后的 `analysis-worker/` 源码目录，并更新 Dockerfile、Compose、Worker 存储路径和模型路径文档
+- 由 `docker/` 统一承载 app 镜像配置、worker 镜像配置、Nginx 配置和具有清晰 local/production 命名的 Compose 文件
+- 如果文档或工作流已不再引用，则删除 `docker-compose.spa.example.yml`
+- 更新英文与简体中文架构、运维、贡献指南、README 和路线图引用
+
+### 退出标准 / 验收标准
+
+- 新贡献者无需了解 Nuxt 到 SPA 的历史迁移，也能从目录名判断当前活跃运行时
+- 除历史路线说明外，`frontend-spa/` 与 `python/` 不再作为活跃路径名出现
+- 旧 Nuxt/Vue 前端被删除，或明确归档在非活跃运行路径之外
+- Docker 相关文件不再分散在仓库根目录、`nginx/`、`backend/docker/`、前端目录和 Worker 目录之间
+- 本地与生产 Compose 配置在移动后仍能通过校验
+- 后端测试、活跃前端构建、文档构建、app 镜像构建和 analysis-worker 镜像构建继续通过
+
 ## v1.5.0 — 发布加固
 
 ### 目标

@@ -1,0 +1,104 @@
+name: ocean
+
+services:
+  app:
+    container_name: ocean-app
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.ustc.edu.cn}
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - laravel-public-storage:/var/www/html/storage/app/public
+    environment:
+      APP_NAME: Ocean
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY:-}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL:-http://127.0.0.1:8080}
+      LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
+      DB_CONNECTION: mariadb
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${MYSQL_DATABASE:-test_db}
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PREFIX: ""
+      QUEUE_CONNECTION: redis
+      ANALYSIS_JOB_REDIS_QUEUE: ${ANALYSIS_JOB_REDIS_QUEUE:-ocean:analysis-jobs:queued}
+      OCEAN_RUN_MIGRATIONS: ${OCEAN_RUN_MIGRATIONS:-false}
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - ocean
+
+  analysis-worker:
+    container_name: ocean-analysis-worker
+    restart: unless-stopped
+    build:
+      context: ./python
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.ustc.edu.cn}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
+    volumes:
+      - laravel-public-storage:/workspace/backend-storage
+    environment:
+      OCEAN_API_BASE: http://app
+      OCEAN_STORAGE_ROOT: /workspace/backend-storage
+      OCEAN_YOLO_MODEL_PATH: ${OCEAN_YOLO_MODEL_PATH:-/workspace/models/uprc2018/best.pt}
+      OCEAN_WORKER_POLL_SECONDS: ${OCEAN_WORKER_POLL_SECONDS:-3}
+      ANALYSIS_JOB_REDIS_QUEUE: ${ANALYSIS_JOB_REDIS_QUEUE:-ocean:analysis-jobs:queued}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - ocean
+
+  db:
+    container_name: ocean-db
+    image: docker.io/library/mariadb:12
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-test_db}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    networks:
+      - ocean
+
+  redis:
+    container_name: ocean-redis
+    image: docker.io/library/redis:8-alpine
+    volumes:
+      - redis-data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - ocean
+
+networks:
+  ocean:
+    name: ocean-network
+
+volumes:
+  laravel-public-storage:
+    name: ocean-laravel-public-storage
+  mariadb-data:
+    name: ocean-mariadb-data
+  redis-data:
+    name: ocean-redis-data

@@ -256,6 +256,10 @@ Make production deployment easier by packaging the main web application into one
 - `docker compose config` and the relevant app-image build command succeed
 - existing backend, SPA, and documentation validation commands still pass
 
+### v1.4.2 implementation note
+
+v1.4.2 ships the production packaging baseline. `compose.prod.yml` introduces an `app` service backed by `docker/app/Dockerfile`, which builds the React/Vite SPA, installs Laravel production Composer dependencies, serves SPA assets through Nginx, and routes `/api/` to local PHP-FPM in the same container. The default and production Compose paths now use `analysis-worker` as the service name for asynchronous model/inference execution, while the implementation source remains in `python/`. The analysis worker image copies worker code and model assets at build time for production use. MariaDB and Redis remain separate services, and migrations remain an explicit deployment step unless `OCEAN_RUN_MIGRATIONS=true` is intentionally enabled.
+
 ## v1.5.0 — Release Hardening
 
 ### Goal

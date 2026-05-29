@@ -256,6 +256,10 @@ v1.4.1 将设置与用户管理作为 SPA 中的一等标签页交付。设置�
 - `docker compose config` 和相关 app 镜像构建命令成功
 - 现有后端、SPA 与文档验证命令继续通过
 
+### v1.4.2 实现说明
+
+v1.4.2 交付生产打包基线。`compose.prod.yml` 引入由 `docker/app/Dockerfile` 构建的 `app` 服务：该镜像会构建 React/Vite SPA、安装 Laravel 生产 Composer 依赖、通过 Nginx 服务 SPA 静态资源，并将 `/api/` 路由到同容器内的 PHP-FPM。默认与生产 Compose 路径都使用 `analysis-worker` 作为异步模型 / 推理执行服务名，但实现源码仍保留在 `python/`。analysis-worker 镜像在构建时复制 Worker 代码和模型资产，满足生产使用。MariaDB 与 Redis 继续作为独立服务，迁移继续作为显式部署步骤，除非明确启用 `OCEAN_RUN_MIGRATIONS=true`。
+
 ## v1.5.0 — 发布加固
 
 ### 目标

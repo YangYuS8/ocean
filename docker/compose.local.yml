@@ -25,7 +25,7 @@ services:
     container_name: ocean-php
     build:
       context: ..
-      dockerfile: docker/php/Dockerfile
+      dockerfile: docker/backend/Dockerfile
       args:
         DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.ustc.edu.cn}
     volumes:

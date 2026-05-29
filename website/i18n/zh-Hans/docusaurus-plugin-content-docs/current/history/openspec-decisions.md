@@ -11,7 +11,7 @@ title: OpenSpec 历史决策摘要
 历史决策已明确：
 
 - 后端工作区位于 `backend/`
-- PHP 运行时配置应归档在 `docker/php/`
+- 后端 PHP 运行时配置应归档在 `docker/backend/`
 - Laravel 是长期后端运行时
 
 ## 2. P0 API 与数据库基础

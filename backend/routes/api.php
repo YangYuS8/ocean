@@ -7,8 +7,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExceptionController;
 use App\Http\Controllers\GovernanceController;
 use App\Http\Controllers\InspectionTaskController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SampleController;
 use App\Http\Controllers\SampleResultController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
@@ -46,3 +48,16 @@ Route::post('/analysis-jobs/{id}/succeed', [AnalysisJobController::class, 'succe
 Route::post('/analysis-jobs/{id}/fail', [AnalysisJobController::class, 'fail'])->middleware('ocean.permission:analysis_job.fail,worker');
 Route::post('/analysis-jobs/{id}/cancel', [AnalysisJobController::class, 'cancel'])->middleware('ocean.permission:analysis_job.cancel,token');
 Route::post('/analysis-jobs/{id}/retry', [AnalysisJobController::class, 'retry'])->middleware('ocean.permission:analysis_job.retry,token');
+
+Route::get('/users', [UserController::class, 'index'])->middleware('ocean.permission:user.list,token');
+Route::post('/users', [UserController::class, 'store'])->middleware('ocean.permission:user.create,token');
+Route::get('/users/{id}', [UserController::class, 'show'])->middleware('ocean.permission:user.list,token');
+Route::patch('/users/{id}', [UserController::class, 'update'])->middleware('ocean.permission:user.update,token');
+Route::put('/users/{id}/roles', [UserController::class, 'replaceRoles'])->middleware('ocean.permission:user.roles.manage,token');
+Route::post('/users/{id}/activate', [UserController::class, 'activate'])->middleware('ocean.permission:user.status,token');
+Route::post('/users/{id}/deactivate', [UserController::class, 'deactivate'])->middleware('ocean.permission:user.status,token');
+
+Route::get('/profile', [ProfileController::class, 'showProfile'])->middleware('ocean.auth:token');
+Route::patch('/profile', [ProfileController::class, 'updateProfile'])->middleware('ocean.auth:token');
+Route::get('/settings', [ProfileController::class, 'showSettings'])->middleware('ocean.auth:token');
+Route::patch('/settings', [ProfileController::class, 'updateSettings'])->middleware('ocean.auth:token');

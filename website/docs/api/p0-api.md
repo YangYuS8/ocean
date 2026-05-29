@@ -50,6 +50,17 @@ This page consolidates the old MVP API scope, field drafts, and OpenSpec require
 - `GET /api/governance/me`
 - `GET /api/governance/roles`
 - `GET /api/audit-events`
+- `GET /api/profile`
+- `PATCH /api/profile`
+- `GET /api/settings`
+- `PATCH /api/settings`
+- `GET /api/users`
+- `POST /api/users`
+- `GET /api/users/{id}`
+- `PATCH /api/users/{id}`
+- `PUT /api/users/{id}/roles`
+- `POST /api/users/{id}/activate`
+- `POST /api/users/{id}/deactivate`
 
 The SPA now uses token login as the primary authentication path:
 
@@ -98,6 +109,40 @@ When present, Laravel resolves the active `users` record, injects the actor into
 `X-Ocean-Actor-Id` is no longer the primary frontend authentication path. It remains an internal transition bridge for non-SPA tooling only.
 
 `GET /api/governance/roles` returns the baseline role catalog and permissions. `GET /api/audit-events` returns paginated audit events and supports filters such as `event_type`, `resource_type`, `resource_id`, `actor_id`, and `actor_source`.
+
+v1.4.1 adds first-class profile, settings, and user administration APIs. `GET /api/profile` and `PATCH /api/profile` are self-service token endpoints for the current user. Safe profile updates are limited to `display_name` and `email`.
+
+`GET /api/settings` and `PATCH /api/settings` persist per-user workspace preferences in `user_preferences`:
+
+```json
+{
+  "language": "zh-Hans",
+  "display_density": "comfortable",
+  "default_workspace_tab": "overview",
+  "settings_json": {
+    "dashboard": {
+      "refresh_seconds": 30
+    }
+  }
+}
+```
+
+`display_density` currently accepts `comfortable` or `compact`. `language` and `default_workspace_tab` are intentionally lightweight strings so the SPA can evolve its tab list without introducing a backend-only UI contract.
+
+Admin user management endpoints require `Authorization: Bearer <token>` and the corresponding RBAC permission. The list endpoint supports `page`, `page_size`, `search`, `status`, and `role` filters and returns each user with roles and preference summary. User creation and update payloads include:
+
+```json
+{
+  "username": "inspector02",
+  "display_name": "Inspector 02",
+  "email": "inspector02@example.com",
+  "status": "active",
+  "password": "password123",
+  "roles": ["inspector"]
+}
+```
+
+`username` is treated as an immutable login identifier after creation. Role replacement is explicit through `PUT /api/users/{id}/roles` with `{ "roles": ["analyst"] }`. Activation and deactivation use dedicated endpoints so operators can distinguish identity lifecycle changes from ordinary profile edits.
 
 ### Dashboard
 
@@ -200,6 +245,8 @@ Sensitive actions require either a header actor or the dedicated internal worker
 
 Sensitive user-initiated mutation requests require a bearer token. Legacy payload identity fields are preserved for actor attribution compatibility, but they do not authorize protected write routes by themselves.
 
+The `admin` role owns v1.4.1 user-management permissions including `user.list`, `user.create`, `user.update`, `user.roles.manage`, and `user.status`. Self-service profile and settings endpoints require a valid token but do not grant administrative user-management access.
+
 Python worker status callbacks use the internal worker bridge:
 
 ```http
@@ -226,6 +273,8 @@ Laravel records audit events for high-value actions including:
 - sample result creation
 - exception open and resolve
 - analysis job queue, start, success, failure, cancel, and retry
+- user creation, update, activation, deactivation, and role replacement
+- current-user profile and settings updates
 
 Audit events include `event_type`, `resource_type`, `resource_id`, `actor_id`, `actor_source`, optional metadata, and `created_at`.
 

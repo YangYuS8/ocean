@@ -219,6 +219,10 @@ Consolidate scattered operational preferences and user identity controls into fi
 - all user mutations are validated and authorized by Laravel
 - English and Simplified Chinese docs describe the Settings/User Management scope before implementation is marked complete
 
+### v1.4.1 implementation note
+
+v1.4.1 ships Settings and Users as first-class SPA tabs. Settings combines current-user profile editing, language preference, display density, default workspace tab, and runtime/auth summary. Users gives administrators one page for user listing, filtering, creation, profile/status/password edits, role replacement, activation, and deactivation. Laravel owns all mutations through token-authenticated APIs, persists user preferences in `user_preferences`, and records audit events for user administration, profile updates, and settings updates. Non-admin users can update their own profile/settings but cannot access administrative user management.
+
 ## v1.5.0 — Release Hardening
 
 ### Goal

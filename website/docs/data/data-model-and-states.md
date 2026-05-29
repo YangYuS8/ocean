@@ -8,7 +8,7 @@ This page consolidates the old data-model draft, state-transition draft, SQL pla
 
 ## Core tables
 
-The P0/v1.4 baseline uses nine core tables:
+The P0/v1.4.1 baseline uses eleven core tables:
 
 - `users`
 - `roles`
@@ -20,6 +20,7 @@ The P0/v1.4 baseline uses nine core tables:
 - `analysis_jobs`
 - `audit_events`
 - `api_tokens`
+- `user_preferences`
 
 ## Data relationships
 
@@ -34,6 +35,7 @@ users ----< inspection_tasks ----< samples ----< sample_results
 
 users ----< audit_events >---- auditable resources
 users ----< api_tokens
+users ---- user_preferences
 ```
 
 `exceptions` uses `resource_type + resource_id` to reference tasks, samples, or result records.
@@ -55,9 +57,22 @@ v1.4.0 adds a baseline governance layer without changing the long-term Laravel o
 - `X-Ocean-Actor-Id` is the internal identity injection bridge.
 - SPA login uses database-backed bearer tokens stored in `api_tokens`.
 - `users`, `roles`, and `user_roles` remain the baseline identity/RBAC tables.
+- v1.4.1 user-facing workspace preferences are persisted in `user_preferences` and owned by a single `users` row.
 - baseline seeded roles are `admin`, `inspector`, `analyst`, and `worker`.
 - legacy payload identity fields remain accepted only as an attribution compatibility path.
 - `audit_events.actor_source` records whether attribution came from `request_header` or legacy `payload`.
+
+### user_preferences
+
+`user_preferences` keeps user-specific workspace settings separate from global identity data:
+
+- `user_id` is unique and references `users.id`
+- `language` stores the preferred UI locale, such as `zh-Hans` or `en`
+- `display_density` stores lightweight display preference, currently `comfortable` or `compact`
+- `default_workspace_tab` stores the preferred landing tab in the SPA workspace
+- `settings_json` is reserved for future per-user preference extensions without changing core identity semantics
+
+The profile fields that identify a person remain in `users` (`username`, `display_name`, `email`, `status`). Role assignments remain in `user_roles`. Settings are not authorization data and must not be used for RBAC decisions.
 
 ## State machines
 

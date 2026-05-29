@@ -8,7 +8,7 @@ title: 数据模型与状态流转
 
 ## 核心表
 
-P0/v1.4 基线使用 9 张核心表：
+P0/v1.4.1 基线使用 11 张核心表：
 
 - `users`
 - `roles`
@@ -20,6 +20,7 @@ P0/v1.4 基线使用 9 张核心表：
 - `analysis_jobs`
 - `audit_events`
 - `api_tokens`
+- `user_preferences`
 
 ## 数据关系
 
@@ -34,6 +35,7 @@ users ----< inspection_tasks ----< samples ----< sample_results
 
 users ----< audit_events >---- auditable resources
 users ----< api_tokens
+users ---- user_preferences
 ```
 
 `exceptions` 通过 `resource_type + resource_id` 关联任务、样本或结果记录。
@@ -55,9 +57,22 @@ v1.4.0 在不改变 Laravel 长期业务所有权的前提下增加基础治理�
 - `X-Ocean-Actor-Id` 是内部身份注入桥接。
 - SPA 登录使用存储在 `api_tokens` 中的数据库 bearer token。
 - `users`、`roles`、`user_roles` 仍是基础身份 / RBAC 表。
+- v1.4.1 面向用户的工作区偏好持久化在 `user_preferences` 中，并归属于单个 `users` 记录。
 - baseline seed 角色包括 `admin`、`inspector`、`analyst`、`worker`。
 - 旧 payload 身份字段只作为归因兼容路径继续保留。
 - `audit_events.actor_source` 记录归因来自 `request_header` 还是旧 `payload`。
+
+### user_preferences
+
+`user_preferences` 将用户专属工作区设置与全局身份数据分离：
+
+- `user_id` 唯一并引用 `users.id`
+- `language` 存储偏好的 UI 语言，例如 `zh-Hans` 或 `en`
+- `display_density` 存储轻量显示偏好，目前为 `comfortable` 或 `compact`
+- `default_workspace_tab` 存储 SPA 工作区默认进入的标签页
+- `settings_json` 预留给后续每用户偏好扩展，避免改变核心身份语义
+
+识别人员身份的资料字段仍保存在 `users`（`username`、`display_name`、`email`、`status`）。角色分配仍保存在 `user_roles`。设置不是授权数据，不能用于 RBAC 决策。
 
 ## 状态机
 

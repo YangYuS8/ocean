@@ -108,6 +108,34 @@ curl -s 'http://127.0.0.1:8080/api/audit-events?resource_type=analysis_job'
 
 Use audit events to verify high-value actions such as task start/submit, sample result creation, exception resolution, and analysis job lifecycle transitions.
 
+### Settings and user management
+
+After logging in as `admin`, capture the bearer token and validate the v1.4.1 governance pages through the API:
+
+```bash
+TOKEN="$(
+  curl -s -X POST http://127.0.0.1:8080/api/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"password"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["token"])'
+)"
+
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/api/profile
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/api/settings
+curl -s -H "Authorization: Bearer $TOKEN" 'http://127.0.0.1:8080/api/users?page_size=20'
+
+curl -s -X PATCH http://127.0.0.1:8080/api/settings \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"language":"zh-Hans","display_density":"comfortable","default_workspace_tab":"settings"}'
+```
+
+To verify audit coverage for user/profile/settings changes:
+
+```bash
+curl -s 'http://127.0.0.1:8080/api/audit-events?resource_type=user&page_size=20'
+```
+
 ### Dashboard summary
 
 ```bash

@@ -50,6 +50,17 @@ title: P0 API
 - `GET /api/governance/me`
 - `GET /api/governance/roles`
 - `GET /api/audit-events`
+- `GET /api/profile`
+- `PATCH /api/profile`
+- `GET /api/settings`
+- `PATCH /api/settings`
+- `GET /api/users`
+- `POST /api/users`
+- `GET /api/users/{id}`
+- `PATCH /api/users/{id}`
+- `PUT /api/users/{id}/roles`
+- `POST /api/users/{id}/activate`
+- `POST /api/users/{id}/deactivate`
 
 SPA 现在以 token 登录作为主要认证路径：
 
@@ -98,6 +109,40 @@ X-Ocean-Actor-Id: 3
 `X-Ocean-Actor-Id` 不再是前端主要认证路径，仅作为非 SPA 工具的内部过渡桥接保留。
 
 `GET /api/governance/roles` 返回基础角色与权限目录。`GET /api/audit-events` 返回分页审计事件，并支持 `event_type`、`resource_type`、`resource_id`、`actor_id`、`actor_source` 等筛选条件。
+
+v1.4.1 增加了一等的个人资料、设置和用户管理 API。`GET /api/profile` 与 `PATCH /api/profile` 是当前用户自助 token 接口，安全自助更新仅限 `display_name` 与 `email`。
+
+`GET /api/settings` 与 `PATCH /api/settings` 会将每个用户的工作区偏好持久化到 `user_preferences`：
+
+```json
+{
+  "language": "zh-Hans",
+  "display_density": "comfortable",
+  "default_workspace_tab": "overview",
+  "settings_json": {
+    "dashboard": {
+      "refresh_seconds": 30
+    }
+  }
+}
+```
+
+`display_density` 当前接受 `comfortable` 或 `compact`。`language` 与 `default_workspace_tab` 保持为轻量字符串，便于 SPA 后续演进标签页列表，而不把 UI 契约固化在后端。
+
+管理员用户管理接口需要 `Authorization: Bearer <token>` 和对应 RBAC 权限。列表接口支持 `page`、`page_size`、`search`、`status`、`role` 筛选，并返回用户角色与偏好摘要。用户创建和更新 payload 包括：
+
+```json
+{
+  "username": "inspector02",
+  "display_name": "Inspector 02",
+  "email": "inspector02@example.com",
+  "status": "active",
+  "password": "password123",
+  "roles": ["inspector"]
+}
+```
+
+`username` 创建后作为不可变登录标识。角色替换通过 `PUT /api/users/{id}/roles` 显式执行，请求体为 `{ "roles": ["analyst"] }`。启用与停用使用独立端点，方便运维区分身份生命周期变化与普通资料编辑。
 
 ### Dashboard
 
@@ -200,6 +245,8 @@ v1.4.0 优先使用 token 认证 actor 注入，同时仍允许显式传入以�
 
 用户发起的敏感写操作必须提供 bearer token。旧 payload 身份字段仍用于 actor 归因兼容，但不能单独授权受保护写路由。
 
+`admin` 角色拥有 v1.4.1 用户管理权限，包括 `user.list`、`user.create`、`user.update`、`user.roles.manage` 与 `user.status`。自助个人资料与设置接口需要有效 token，但不会授予管理员级用户管理权限。
+
 Python Worker 状态回调使用内部 worker 桥接：
 
 ```http
@@ -226,6 +273,8 @@ Laravel 会为高价值动作记录审计事件，包括：
 - 样本结果创建
 - 异常打开与解决
 - 分析作业排队、开始、成功、失败、取消与重试
+- 用户创建、更新、启用、停用与角色替换
+- 当前用户个人资料与设置更新
 
 审计事件包含 `event_type`、`resource_type`、`resource_id`、`actor_id`、`actor_source`、可选 metadata 和 `created_at`。
 

@@ -108,6 +108,34 @@ curl -s 'http://127.0.0.1:8080/api/audit-events?resource_type=analysis_job'
 
 可通过审计事件验证任务开始/提交、样本结果创建、异常解决、分析作业生命周期推进等高价值动作。
 
+### 设置与用户管理
+
+以 `admin` 登录后，保存 bearer token 并通过 API 验证 v1.4.1 治理页面：
+
+```bash
+TOKEN="$(
+  curl -s -X POST http://127.0.0.1:8080/api/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"password"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["token"])'
+)"
+
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/api/profile
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/api/settings
+curl -s -H "Authorization: Bearer $TOKEN" 'http://127.0.0.1:8080/api/users?page_size=20'
+
+curl -s -X PATCH http://127.0.0.1:8080/api/settings \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"language":"zh-Hans","display_density":"comfortable","default_workspace_tab":"settings"}'
+```
+
+验证用户、个人资料和设置变更的审计覆盖：
+
+```bash
+curl -s 'http://127.0.0.1:8080/api/audit-events?resource_type=user&page_size=20'
+```
+
 ### 首页摘要
 
 ```bash

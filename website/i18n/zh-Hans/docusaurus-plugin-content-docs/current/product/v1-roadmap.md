@@ -298,6 +298,41 @@ v1.4.2 交付生产打包基线。`docker/compose.prod.yml` 引入由 `docker/ap
 
 v1.4.3 规范活跃仓库布局。React/Vite SPA 转正为 `frontend/`，旧 Nuxt/Vue 实现被删除，Worker 源码移动到 `analysis-worker/`，Docker 相关资产移动到 `docker/` 下，并用明确名称区分本地与生产 Compose 文件。根目录 `docker-compose.yml` 仅作为本地上手兼容 include 保留。
 
+## v1.4.4 — 发布镜像推送
+
+### 目标
+
+让 tag 发布流程产出运维上线所需的可部署 Docker 镜像，使生产发布更可重复。
+
+### 范围
+
+- 将后端开发 Docker 配置从 `docker/php/` 重命名为 `docker/backend/`，让文件位置匹配已规范化的仓库词汇
+- 在保持本地 Compose 服务名兼容的同时，让源码 Docker 配置按职责命名
+- 扩展 GitHub release 工作流，将生产 `app` 与 `analysis-worker` 镜像构建并推送到 GitHub Container Registry
+- 扩展 CNB tag release 流水线，将同一组发布镜像构建并推送到 CNB Docker 制品库
+- 发布镜像同时包含不可变版本 tag 与移动的 `latest` tag
+- 文档化发布镜像位置，以及它们与 `docker/compose.prod.yml` 的关系
+
+### 主要交付物
+
+- `docker/backend/` 作为后端 PHP-FPM 开发镜像配置路径
+- GitHub release 工作流发布 `ghcr.io/<owner>/<repo>/app:<tag>` 与 `ghcr.io/<owner>/<repo>/analysis-worker:<tag>`，并同步发布 `latest`
+- CNB tag release 流水线在 `$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/` 下发布 app 与 analysis-worker 镜像
+- 发布说明中包含已发布容器镜像位置
+- 更新运维文档，说明发布镜像推送和 registry 行为
+
+### 退出标准 / 验收标准
+
+- 后端 Docker 配置重命名后，本地与生产 Compose 配置仍能通过校验
+- GitHub release 工作流具备 `packages: write` 权限和经过认证的 GHCR Docker build/push 步骤
+- CNB 流水线在 tag release 中启用 Docker 服务并通过校验
+- 文档说明两个发布镜像、对应 registry 与 tag 语义
+- 在标记 v1.4.4 完成前，app 与 analysis-worker 镜像构建继续通过
+
+### v1.4.4 实现说明
+
+v1.4.4 将发布打包显式化。后端开发 Docker 配置现在位于 `docker/backend/`，本地 Compose 服务名仍可保留为 `php` 以兼容既有命令。GitHub tag release 会构建生产 `app` 镜像和独立 `analysis-worker` 镜像，并以发布 tag 和 `latest` 推送到 GHCR。CNB tag release 会将同一组镜像推送到仓库 slug 下的 CNB Docker 制品库，同样使用发布 tag 与 `latest`。MariaDB 与 Redis 仍是外部运行时服务，不会被打包进任一发布镜像。
+
 ## v1.5.0 — 发布加固
 
 ### 目标

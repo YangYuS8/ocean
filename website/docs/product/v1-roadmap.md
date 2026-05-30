@@ -298,6 +298,41 @@ Make the repository layout match the product architecture now that the React/Vit
 
 v1.4.3 normalizes the active repository layout. The React/Vite SPA is promoted to `frontend/`, the old Nuxt/Vue implementation is removed, the worker source moves to `analysis-worker/`, and Docker-related assets move under `docker/` with explicit local and production Compose files. The root `docker-compose.yml` remains only as a lightweight compatibility include for local onboarding.
 
+## v1.4.4 — Release Image Publishing
+
+### Goal
+
+Make tagged releases publish the deployable Docker images that operators need for repeatable production rollout.
+
+### Scope
+
+- rename backend development Docker configuration from `docker/php/` to `docker/backend/` so file locations match the normalized repository vocabulary
+- keep local Compose service names compatible while making the source Docker config role-oriented
+- extend the GitHub release workflow to build and push the production `app` and `analysis-worker` images to GitHub Container Registry
+- extend the CNB tag release pipeline to build and push the same release image set to the CNB Docker registry
+- include both immutable version tags and a moving `latest` tag for release images
+- document where release images are published and how they relate to `docker/compose.prod.yml`
+
+### Primary deliverables
+
+- `docker/backend/` as the backend PHP-FPM development image configuration path
+- GitHub release workflow publishing `ghcr.io/<owner>/<repo>/app:<tag>` and `ghcr.io/<owner>/<repo>/analysis-worker:<tag>` plus `latest`
+- CNB tag release pipeline publishing app and analysis-worker images under `$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/`
+- release notes that mention published container image locations
+- updated operations documentation for release image publishing and registry behavior
+
+### Exit criteria
+
+- local and production Compose configs still validate after the backend Docker config rename
+- GitHub release workflow has `packages: write` and authenticated GHCR Docker build/push steps
+- CNB pipeline validates with Docker service support for tag releases
+- documentation describes the two published images, their registries, and the intended tag semantics
+- app and analysis-worker image builds continue to pass before the v1.4.4 work is marked complete
+
+### v1.4.4 implementation note
+
+v1.4.4 makes release packaging explicit. Backend development Docker configuration now lives in `docker/backend/`, while the local Compose service can remain `php` for compatibility. GitHub tag releases build and push the production `app` image and the separate `analysis-worker` image to GHCR with the release tag and `latest`. CNB tag releases build and push the same image pair to the CNB Docker registry under the repository slug, also using the release tag and `latest`. MariaDB and Redis remain external runtime services; they are not baked into either release image.
+
 ## v1.5.0 — Release Hardening
 
 ### Goal

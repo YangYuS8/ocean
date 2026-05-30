@@ -247,6 +247,37 @@ website/              Docusaurus 文档站
 
 根目录 Compose 文件已最小化。优先使用 `docker/compose.local.yml` 与 `docker/compose.prod.yml` 这类明确路径；根目录 `docker-compose.yml` 仅作为本地上手兼容 include 保留。
 
+## v1.4.4 发布镜像推送
+
+发布 tag 现在会推送生产拓扑所需的可部署镜像组合：
+
+- `app`：Nginx + PHP-FPM + Laravel API + 构建后的 React/Vite SPA
+- `analysis-worker`：异步分析、图像 / 模型推理和结果回写运行时
+
+MariaDB 与 Redis 继续作为独立有状态服务，不包含在发布镜像中。
+
+GitHub release 会推送到 GitHub Container Registry：
+
+```text
+ghcr.io/<owner>/<repo>/app:<release-tag>
+ghcr.io/<owner>/<repo>/app:latest
+ghcr.io/<owner>/<repo>/analysis-worker:<release-tag>
+ghcr.io/<owner>/<repo>/analysis-worker:latest
+```
+
+CNB tag release 会将同一组镜像推送到仓库 slug 下的 CNB Docker 制品库：
+
+```text
+$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/app:<release-tag>
+$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/app:latest
+$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/analysis-worker:<release-tag>
+$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/analysis-worker:latest
+```
+
+生产上线应优先使用不可变发布 tag。`latest` 只作为冒烟验证或明确希望跟随最新发布的受控环境便利指针。
+
+后端开发 Docker 配置路径为 `docker/backend/`。本地 Compose 服务仍可命名为 `php` 以兼容既有命令，但新增文件路径引用应使用 `docker/backend/`，不要再使用旧的 `docker/php/` 名称。
+
 ## 长期不推荐的方向
 
 项目不应继续把 `Nuxt SSR / Nitro` 视作长期部署主线，因为：

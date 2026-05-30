@@ -247,6 +247,37 @@ The old Nuxt/Vue implementation no longer occupies the active `frontend/` path. 
 
 Root-level Compose files are minimized. Use explicit Docker paths such as `docker/compose.local.yml` and `docker/compose.prod.yml`; the root `docker-compose.yml` remains only as a lightweight compatibility include for local onboarding.
 
+## v1.4.4 release image publishing
+
+Release tags now publish the deployable image pair for the production topology:
+
+- `app`: Nginx + PHP-FPM + Laravel API + built React/Vite SPA
+- `analysis-worker`: asynchronous analysis, image/model inference, and result write-back runtime
+
+MariaDB and Redis remain separate stateful services and are not included in the release images.
+
+GitHub releases publish to GitHub Container Registry:
+
+```text
+ghcr.io/<owner>/<repo>/app:<release-tag>
+ghcr.io/<owner>/<repo>/app:latest
+ghcr.io/<owner>/<repo>/analysis-worker:<release-tag>
+ghcr.io/<owner>/<repo>/analysis-worker:latest
+```
+
+CNB tag releases publish the same image pair to the CNB Docker registry under the repository slug:
+
+```text
+$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/app:<release-tag>
+$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/app:latest
+$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/analysis-worker:<release-tag>
+$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/analysis-worker:latest
+```
+
+Use immutable release tags for production rollouts. Treat `latest` as a convenience pointer for smoke testing or controlled environments that intentionally follow the newest published release.
+
+The backend development Docker configuration path is `docker/backend/`. The local Compose service can still be named `php` for compatibility with existing commands, but new file-path references should use `docker/backend/` rather than the old `docker/php/` name.
+
 ## Long-term direction explicitly not recommended
 
 The project should not continue to treat `Nuxt SSR / Nitro` as the long-term deployment mainline, because:

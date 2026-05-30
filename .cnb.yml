@@ -117,61 +117,18 @@ $:
               export COMPARE_URL=""
             fi
 
-            git log "$range" --reverse --pretty=format:'%H%x1f%h%x1f%an%x1f%s' > commits.tsv
-
-            python3 <<'PY'
-            from collections import OrderedDict
-            import os
-
-            tag = os.environ["TAG_NAME"]
-            intro = os.environ["INTRO"]
-            compare_url = os.environ.get("COMPARE_URL", "")
-
-            groups = OrderedDict([
-                ("feat", ("Features", [])),
-                ("fix", ("Bug Fixes", [])),
-                ("docs", ("Documentation", [])),
-                ("perf", ("Performance", [])),
-                ("refactor", ("Refactoring", [])),
-                ("test", ("Tests", [])),
-                ("build", ("Build", [])),
-                ("ci", ("CI", [])),
-                ("chore", ("Maintenance", [])),
-                ("deps", ("Dependencies", [])),
-                ("other", ("Other Changes", [])),
-            ])
-
-            def classify(subject: str) -> str:
-                prefix = subject.split(":", 1)[0].lower()
-                kind = prefix.split("(", 1)[0]
-                if "deps" in kind or subject.startswith("chore(deps") or subject.startswith("chore(frontend-deps"):
-                    return "deps"
-                return kind if kind in groups else "other"
-
-            with open("commits.tsv", encoding="utf-8") as commits:
-                for line in commits:
-                    line = line.rstrip("\n")
-                    if not line:
-                        continue
-                    full, short, author, subject = line.split("\x1f", 3)
-                    key = classify(subject)
-                    groups[key][1].append(f"-   {subject} (`{short}`, {author})")
-
-            with open("release-notes.md", "w", encoding="utf-8") as out:
-                out.write(f"## Ocean {tag}\n\n")
-                out.write(f"{intro}\n")
-                for _key, (title, entries) in groups.items():
-                    if not entries:
-                        continue
-                    out.write(f"\n## {title}\n\n")
-                    out.write("\n".join(entries))
-                    out.write("\n")
-                out.write("\n## Validation\n\n")
-                out.write("-   Build and runtime validation should follow the project checks documented in `README.md` and `website/docs/operations/deployment.md`.\n")
-                out.write("-   Release images are published to the CNB Docker registry as app and analysis-worker images under this repository slug.\n")
-                if compare_url:
-                    out.write(f"\n**Full Changelog**: {compare_url}\n")
-            PY
+            {
+              printf '## Ocean %s\n\n' "$TAG_NAME"
+              printf '%s\n' "$INTRO"
+              printf '\n## Changes\n\n'
+              git log "$range" --reverse --pretty=format:'-   %s (`%h`, %an)'
+              printf '\n\n## Validation\n\n'
+              printf '%s\n' '-   Build and runtime validation should follow the project checks documented in `README.md` and `website/docs/operations/deployment.md`.'
+              printf '%s\n' '-   Release images are published to the CNB Docker registry as app and analysis-worker images under this repository slug.'
+              if [ -n "$COMPARE_URL" ]; then
+                printf '\n**Full Changelog**: %s\n' "$COMPARE_URL"
+              fi
+            } > release-notes.md
 
         - name: publish CNB release
           if: 'case "$CNB_BRANCH" in v[0-9]*.[0-9]*.[0-9]*) exit 0 ;; *) exit 1 ;; esac'

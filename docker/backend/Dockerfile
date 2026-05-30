@@ -21,4 +21,4 @@ RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
 RUN pecl install xdebug \
 && docker-php-ext-enable xdebug
 
-COPY docker/php/php.ini /usr/local/etc/php/php.ini
+COPY docker/backend/php.ini /usr/local/etc/php/php.ini

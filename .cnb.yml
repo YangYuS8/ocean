@@ -4,7 +4,7 @@ main:
       runner:
         cpus: 2
       docker:
-        image: node:20
+        image: node:24
         volumes:
           - cache:/root/.npm:rw
       imports:
@@ -37,7 +37,7 @@ main:
       runner:
         cpus: 2
       docker:
-        image: node:20
+        image: node:24
         volumes:
           - cache:/root/.npm:rw
       stages:
@@ -79,8 +79,9 @@ $:
           script: |
             set -euo pipefail
 
-            app_image="$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/app"
-            worker_image="$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/analysis-worker"
+            repo_slug="$(printf '%s' "$CNB_REPO_SLUG" | tr '[:upper:]' '[:lower:]')"
+            app_image="$CNB_DOCKER_REGISTRY/$repo_slug/app"
+            worker_image="$CNB_DOCKER_REGISTRY/$repo_slug/analysis-worker"
 
             docker build \
               -f docker/app/Dockerfile \

@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 concurrency:
   group: release-${{ github.ref_name || inputs.tag }}
@@ -21,6 +22,8 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,6 +42,53 @@ jobs:
 
       - name: Verify tag exists
         run: git rev-parse --verify "refs/tags/${{ steps.release.outputs.tag }}"
+
+      - name: Resolve image names
+        id: images
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "app=${REGISTRY}/${repo}/app" >> "$GITHUB_OUTPUT"
+          echo "analysis_worker=${REGISTRY}/${repo}/analysis-worker" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and publish app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/app/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.images.outputs.app }}:${{ steps.release.outputs.tag }}
+            ${{ steps.images.outputs.app }}:latest
+          labels: |
+            org.opencontainers.image.title=Ocean App
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.release.outputs.tag }}
+
+      - name: Build and publish analysis worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/analysis-worker/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.images.outputs.analysis_worker }}:${{ steps.release.outputs.tag }}
+            ${{ steps.images.outputs.analysis_worker }}:latest
+          labels: |
+            org.opencontainers.image.title=Ocean Analysis Worker
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.release.outputs.tag }}
 
       - name: Generate release notes
         env:
@@ -109,6 +159,7 @@ jobs:
                   out.write("\n")
               out.write("\n## Validation\n\n")
               out.write("-   Build and runtime validation should follow the project checks documented in `README.md` and `website/docs/operations/deployment.md`.\n")
+              out.write(f"-   Release images are published to GitHub Container Registry as `ghcr.io/{os.environ['REPOSITORY'].lower()}/app` and `ghcr.io/{os.environ['REPOSITORY'].lower()}/analysis-worker`.\n")
               if compare_url:
                   out.write(f"\n**Full Changelog**: {compare_url}\n")
           PY

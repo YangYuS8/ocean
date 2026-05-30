@@ -58,6 +58,8 @@ $:
         cpus: 2
       docker:
         image: cnbcool/default-build-env:latest
+      services:
+        - docker
       stages:
         - name: verify release tag
           script: |
@@ -71,6 +73,31 @@ $:
             esac
 
             git rev-parse --verify "refs/tags/$CNB_BRANCH"
+
+        - name: build and publish release images
+          if: 'case "$CNB_BRANCH" in v[0-9]*.[0-9]*.[0-9]*) exit 0 ;; *) exit 1 ;; esac'
+          script: |
+            set -euo pipefail
+
+            app_image="$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/app"
+            worker_image="$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG/analysis-worker"
+
+            docker build \
+              -f docker/app/Dockerfile \
+              -t "$app_image:$CNB_BRANCH" \
+              -t "$app_image:latest" \
+              .
+
+            docker build \
+              -f docker/analysis-worker/Dockerfile \
+              -t "$worker_image:$CNB_BRANCH" \
+              -t "$worker_image:latest" \
+              .
+
+            docker push "$app_image:$CNB_BRANCH"
+            docker push "$app_image:latest"
+            docker push "$worker_image:$CNB_BRANCH"
+            docker push "$worker_image:latest"
 
         - name: generate release notes
           if: 'case "$CNB_BRANCH" in v[0-9]*.[0-9]*.[0-9]*) exit 0 ;; *) exit 1 ;; esac'
@@ -140,6 +167,7 @@ $:
                     out.write("\n")
                 out.write("\n## Validation\n\n")
                 out.write("-   Build and runtime validation should follow the project checks documented in `README.md` and `website/docs/operations/deployment.md`.\n")
+                out.write("-   Release images are published to the CNB Docker registry as app and analysis-worker images under this repository slug.\n")
                 if compare_url:
                     out.write(f"\n**Full Changelog**: {compare_url}\n")
             PY

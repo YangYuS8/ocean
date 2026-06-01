@@ -2,7 +2,7 @@ main:
   push:
     - name: docs-pages
       runner:
-        cpus: 2
+        cpus: 64
       docker:
         image: node:24
         volumes:
@@ -35,7 +35,7 @@ main:
   pull_request:
     - name: docs-build-check
       runner:
-        cpus: 2
+        cpus: 64
       docker:
         image: node:24
         volumes:
@@ -52,10 +52,40 @@ main:
               npm run build
 
 $:
+  vscode:
+    - name: dev
+      runner:
+        cpus: 16
+      docker:
+        image: docker.cnb.cool/nesoriel/dev-default:latest
+      services:
+        - vscode
+        - docker
+      env:
+        LANG: zh_CN.UTF-8
+        LANGUAGE: zh_CN:zh
+        LC_ALL: zh_CN.UTF-8
+        TZ: Asia/Shanghai
+        EDITOR: code
+        VISUAL: code
+      stages:
+        - name: workspace environment summary
+          script: |
+            set -euo pipefail
+            pwd
+            git --version
+            node --version || true
+            pnpm --version || true
+            php --version || true
+            composer --version || true
+            python --version || true
+            uv --version || true
+            docker --version || true
+
   tag_push:
     - name: release
       runner:
-        cpus: 2
+        cpus: 64
       docker:
         image: cnbcool/default-build-env:latest
       services:
